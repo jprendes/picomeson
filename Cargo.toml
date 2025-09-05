@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 as-any = "0.3.2"
 semver = "1.0.26"
+tempfile = "3.21.0"
