@@ -1,6 +1,8 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::collections::HashMap;
+use std::path::PathBuf;
 
-use crate::interpreter::{InterpreterError, Value, builtins::files::files_impl};
+use crate::interpreter::builtins::files::files_impl;
+use crate::interpreter::{InterpreterError, Value};
 
 pub fn install_headers(
     args: Vec<Value>,

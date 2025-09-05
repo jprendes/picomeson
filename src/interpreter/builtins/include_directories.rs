@@ -1,10 +1,8 @@
 use std::collections::HashMap;
 
 use super::builtin_impl;
-use crate::interpreter::{
-    InterpreterError, MesonObject, Value,
-    builtins::files::{File, files_impl},
-};
+use crate::interpreter::builtins::files::{File, files_impl};
+use crate::interpreter::{InterpreterError, MesonObject, Value};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct IncludeDirectories {

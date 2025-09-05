@@ -1,13 +1,11 @@
-use std::{
-    collections::HashMap,
-    process::{Command, Stdio},
-};
+use std::collections::HashMap;
+use std::process::{Command, Stdio};
 
 use tempfile::tempdir;
 
-use crate::interpreter::{InterpreterError, MesonObject, Value, builtins::utils::flatten};
-
 use super::builtin_impl;
+use crate::interpreter::builtins::utils::flatten;
+use crate::interpreter::{InterpreterError, MesonObject, Value};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Compiler {

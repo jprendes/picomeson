@@ -1,10 +1,10 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::collections::HashMap;
+use std::path::PathBuf;
 
 use super::builtin_impl;
-use crate::interpreter::{
-    InterpreterError, MesonObject, Value,
-    builtins::{compiler::get_compiler, version::version},
-};
+use crate::interpreter::builtins::compiler::get_compiler;
+use crate::interpreter::builtins::version::version;
+use crate::interpreter::{InterpreterError, MesonObject, Value};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Meson {

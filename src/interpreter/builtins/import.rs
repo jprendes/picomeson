@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 
-use crate::interpreter::{
-    InterpreterError, MesonObject as _, Value, builtins::filesystem::filesystem,
-};
+use crate::interpreter::builtins::filesystem::filesystem;
+use crate::interpreter::{InterpreterError, MesonObject as _, Value};
 
 pub fn import(
     args: Vec<Value>,

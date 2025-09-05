@@ -1,4 +1,6 @@
-use std::{collections::HashMap, path::PathBuf, process::Command};
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::process::Command;
 
 use super::builtin_impl;
 use crate::interpreter::{InterpreterError, MesonObject, Value};

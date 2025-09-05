@@ -1,8 +1,9 @@
-use std::{collections::HashMap, process::Command};
-
-use crate::interpreter::{InterpreterError, MesonObject, Value, builtins::utils::flatten};
+use std::collections::HashMap;
+use std::process::Command;
 
 use super::builtin_impl;
+use crate::interpreter::builtins::utils::flatten;
+use crate::interpreter::{InterpreterError, MesonObject, Value};
 
 #[derive(Debug, Clone, PartialEq)]
 struct RunResult {

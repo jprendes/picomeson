@@ -1,4 +1,5 @@
-use std::{collections::HashMap, env};
+use std::collections::HashMap;
+use std::env;
 
 use super::builtin_impl;
 use crate::interpreter::{InterpreterError, MesonObject, Value};

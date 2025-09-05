@@ -1,9 +1,11 @@
-use std::{collections::HashMap, env, path::PathBuf, slice::Iter};
+use std::collections::HashMap;
+use std::env;
+use std::path::PathBuf;
+use std::slice::Iter;
 
-use crate::interpreter::{
-    InterpreterError, MesonObject, Value,
-    builtins::{builtin_impl, utils::flatten},
-};
+use crate::interpreter::builtins::builtin_impl;
+use crate::interpreter::builtins::utils::flatten;
+use crate::interpreter::{InterpreterError, MesonObject, Value};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct File {
@@ -15,7 +17,9 @@ impl MesonObject for File {
     builtin_impl!();
 }
 
-pub(super) fn files_impl<'a>(args: impl IntoIterator<Item = &'a Value, IntoIter = Iter<'a, Value>>) -> Result<Vec<File>, InterpreterError> {
+pub(super) fn files_impl<'a>(
+    args: impl IntoIterator<Item = &'a Value, IntoIter = Iter<'a, Value>>,
+) -> Result<Vec<File>, InterpreterError> {
     let pwd = env::current_dir().unwrap();
     flatten(args)
         .map(|arg| match arg {

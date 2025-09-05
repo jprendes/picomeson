@@ -2,7 +2,9 @@ use std::slice::Iter;
 
 use crate::interpreter::Value;
 
-pub fn flatten<'a>(args: impl IntoIterator<Item = &'a Value, IntoIter = Iter<'a, Value>>) -> Flatten<'a> {
+pub fn flatten<'a>(
+    args: impl IntoIterator<Item = &'a Value, IntoIter = Iter<'a, Value>>,
+) -> Flatten<'a> {
     Flatten::new(args)
 }
 

@@ -1,12 +1,8 @@
 use std::collections::HashMap;
 
-use crate::interpreter::{
-    InterpreterError, MesonObject, Value,
-    builtins::{
-        builtin_impl,
-        files::{File, files_impl},
-    },
-};
+use crate::interpreter::builtins::builtin_impl;
+use crate::interpreter::builtins::files::{File, files_impl};
+use crate::interpreter::{InterpreterError, MesonObject, Value};
 
 #[derive(Debug, Clone, PartialEq)]
 enum TargetType {
