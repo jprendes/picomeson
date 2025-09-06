@@ -71,16 +71,12 @@ pub fn find_program(
     }
 
     match kwargs.get("required") {
-        Some(Value::Boolean(true)) => {
-            return Err(InterpreterError::RuntimeError(format!(
-                "Program '{prog}' not found",
-            )));
-        }
         None | Some(Value::Boolean(false)) => Ok(program),
-        _ => {
-            return Err(InterpreterError::TypeError(
-                "The 'required' keyword argument must be a boolean".into(),
-            ));
-        }
+        Some(Value::Boolean(true)) => Err(InterpreterError::RuntimeError(format!(
+            "Program '{prog}' not found",
+        ))),
+        _ => Err(InterpreterError::TypeError(
+            "The 'required' keyword argument must be a boolean".into(),
+        )),
     }
 }

@@ -63,7 +63,7 @@ pub fn run_command(
         ));
     }
 
-    let (stdout, stderr, status_code) = Command::new(&cmd_args[0])
+    let (stdout, stderr, status_code) = Command::new(cmd_args[0])
         .args(&cmd_args[1..])
         .output()
         .map(|output| (output.stdout, output.stderr, output.status.code()))

@@ -22,7 +22,7 @@ use builtins::meson::{Meson, meson};
 use builtins::run_result::run_command;
 
 thread_local! {
-    pub static CURRENT_INTERPRETER: RefCell<Option<Rc<RefCell<Interpreter>>>> = RefCell::new(None);
+    pub static CURRENT_INTERPRETER: RefCell<Option<Rc<RefCell<Interpreter>>>> = const { RefCell::new(None) };
 }
 
 #[derive(Debug, Clone)]
@@ -271,10 +271,8 @@ impl Interpreter {
                             break;
                         }
                     }
-                    if !executed {
-                        if let Some(else_body) = else_branch {
-                            self.execute_block(else_body)?;
-                        }
+                    if !executed && let Some(else_body) = else_branch {
+                        self.execute_block(else_body)?;
                     }
                 }
             }
@@ -363,7 +361,7 @@ impl Interpreter {
                 .variables
                 .get(&name)
                 .cloned()
-                .ok_or_else(|| InterpreterError::UndefinedVariable(name)),
+                .ok_or(InterpreterError::UndefinedVariable(name)),
             AstValue::FunctionCall(name, args, kwargs) => self.call_function(&name, args, kwargs),
             AstValue::MethodCall(object, method, args, kwargs) => {
                 let obj = self.evaluate_value(*object)?;
@@ -503,9 +501,9 @@ impl Interpreter {
                     }
                     Ok(Value::None)
                 } else {
-                    return Err(InterpreterError::TypeError(
+                    Err(InterpreterError::TypeError(
                         "First argument to option must be a string".to_string(),
-                    ));
+                    ))
                 }
             }
             "get_option" => {
@@ -740,7 +738,7 @@ impl Interpreter {
                 }
                 "substring" => {
                     let start = eval_args
-                        .get(0)
+                        .first()
                         .and_then(|v| {
                             if let Value::Integer(i) = v {
                                 Some(*i as usize)

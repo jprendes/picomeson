@@ -36,7 +36,7 @@ impl MesonObject for Version {
 
 pub fn version(version: impl AsRef<str>) -> Result<Value, InterpreterError> {
     let version = version.as_ref();
-    let version = semver::Version::parse(version.as_ref()).map_err(|e| {
+    let version = semver::Version::parse(version).map_err(|e| {
         InterpreterError::RuntimeError(format!("Invalid version string '{version}': {e}",))
     })?;
     Ok(Version { version }.into_object())

@@ -17,7 +17,7 @@ impl FileSystem {
         args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
     ) -> Result<Value, InterpreterError> {
-        let Some(Value::String(path)) = args.get(0) else {
+        let Some(Value::String(path)) = args.first() else {
             return Err(InterpreterError::TypeError(
                 "Expected a string argument".into(),
             ));
@@ -30,7 +30,7 @@ impl FileSystem {
         args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
     ) -> Result<Value, InterpreterError> {
-        let Some(Value::String(path)) = args.get(0) else {
+        let Some(Value::String(path)) = args.first() else {
             return Err(InterpreterError::TypeError(
                 "Expected a string argument".into(),
             ));
@@ -43,7 +43,7 @@ impl FileSystem {
         args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
     ) -> Result<Value, InterpreterError> {
-        let Some(Value::String(path)) = args.get(0) else {
+        let Some(Value::String(path)) = args.first() else {
             return Err(InterpreterError::TypeError(
                 "Expected a string argument".into(),
             ));
@@ -56,7 +56,7 @@ impl FileSystem {
         args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
     ) -> Result<Value, InterpreterError> {
-        let Some(Value::String(path)) = args.get(0) else {
+        let Some(Value::String(path)) = args.first() else {
             return Err(InterpreterError::TypeError(
                 "Expected a string argument".into(),
             ));

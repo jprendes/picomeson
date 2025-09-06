@@ -24,9 +24,7 @@ impl<'a> Iterator for Flatten<'a> {
     type Item = &'a Value;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let Some(args) = self.args_stack.pop() else {
-            return None;
-        };
+        let args = self.args_stack.pop()?;
 
         if args.is_empty() {
             return self.next();

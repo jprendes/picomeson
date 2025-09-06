@@ -41,7 +41,7 @@ impl ConfigData {
         args: Vec<Value>,
         kwargs: HashMap<String, Value>,
     ) -> Result<Value, InterpreterError> {
-        let Some(Value::String(key)) = args.get(0) else {
+        let Some(Value::String(key)) = args.first() else {
             return Err(InterpreterError::TypeError(
                 "Expected a string as the first argument".into(),
             ));
@@ -103,7 +103,7 @@ impl ConfigData {
         args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
     ) -> Result<Value, InterpreterError> {
-        let other = match args.get(0) {
+        let other = match args.first() {
             Some(Value::Object(other)) => other.borrow().downcast_ref::<ConfigData>()?.clone(),
             Some(Value::Dict(dict)) => ConfigData::from_dict(dict.clone()),
             _ => {
@@ -112,7 +112,7 @@ impl ConfigData {
                 ));
             }
         };
-        self.data.extend(other.data.into_iter());
+        self.data.extend(other.data);
         Ok(Value::None)
     }
 }
@@ -159,7 +159,7 @@ pub fn configure_file(
     let mut content = String::from("#pragma once\n\n");
 
     for (key, (value, desc)) in configuration.data.iter() {
-        if desc != "" {
+        if !desc.is_empty() {
             content.push_str(&format!("// {}\n", desc));
         }
         match value {

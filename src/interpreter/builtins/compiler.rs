@@ -105,7 +105,7 @@ impl Compiler {
 
         let args = args
             .into_iter()
-            .filter_map(|arg| match self.try_compile(&["-c"], &[&arg], "") {
+            .filter_map(|arg| match self.try_compile(&["-c"], &[arg], "") {
                 Ok(TryCompileResult { success, .. }) => success.then_some(Ok(arg)),
                 Err(e) => Some(Err(e)),
             })
@@ -352,22 +352,16 @@ pub fn get_compiler(
     match lang.as_str() {
         "c" => {
             let command = std::env::var("CC").unwrap_or_else(|_| "cc".to_string());
-            return Ok(Compiler {
-                command: vec![command],
-            }
-            .into_object());
+            let command = vec![command];
+            Ok(Compiler { command }.into_object())
         }
         "cpp" => {
             let command = std::env::var("CXX").unwrap_or_else(|_| "c++".to_string());
-            return Ok(Compiler {
-                command: vec![command],
-            }
-            .into_object());
+            let command = vec![command];
+            Ok(Compiler { command }.into_object())
         }
-        lang => {
-            return Err(InterpreterError::RuntimeError(format!(
-                "Unsupported language '{lang}'"
-            )));
-        }
+        lang => Err(InterpreterError::RuntimeError(format!(
+            "Unsupported language '{lang}'"
+        ))),
     }
 }

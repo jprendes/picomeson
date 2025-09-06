@@ -7,7 +7,7 @@ pub fn import(
     args: Vec<Value>,
     _kwargs: HashMap<String, Value>,
 ) -> Result<Value, InterpreterError> {
-    let Some(Value::String(module_name)) = args.get(0) else {
+    let Some(Value::String(module_name)) = args.first() else {
         return Err(InterpreterError::TypeError(
             "import requires a string argument".to_string(),
         ));

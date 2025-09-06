@@ -45,7 +45,7 @@ pub fn static_library(
     args: Vec<Value>,
     _kwargs: HashMap<String, Value>,
 ) -> Result<Value, InterpreterError> {
-    let Some(Value::String(name)) = args.get(0) else {
+    let Some(Value::String(name)) = args.first() else {
         return Err(InterpreterError::TypeError(
             "First argument to static_library must be a string (name)".into(),
         ));
@@ -68,7 +68,7 @@ pub fn executable(
     args: Vec<Value>,
     _kwargs: HashMap<String, Value>,
 ) -> Result<Value, InterpreterError> {
-    let Some(Value::String(name)) = args.get(0) else {
+    let Some(Value::String(name)) = args.first() else {
         return Err(InterpreterError::TypeError(
             "First argument to executable must be a string (name)".into(),
         ));

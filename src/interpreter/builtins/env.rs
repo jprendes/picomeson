@@ -72,7 +72,7 @@ pub fn environment(
 ) -> Result<Value, InterpreterError> {
     let vars = match args.first() {
         Some(Value::Dict(data)) => data
-            .into_iter()
+            .iter()
             .map(|(k, v)| match v {
                 Value::String(s) => Ok((k.clone(), s.clone())),
                 _ => Err(InterpreterError::TypeError(
