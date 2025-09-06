@@ -25,10 +25,7 @@ macro_rules! builtin_impl {
             match name {
                 $(stringify!($method) => self.$method(_args, _kwargs),)*
                 "to_string" => Ok(crate::interpreter::Value::String(self.to_string())),
-                _ => Err(crate::interpreter::InterpreterError::RuntimeError(format!(
-                    "Unknown method '{name}' for {} object",
-                    core::any::type_name::<Self>()
-                ))),
+                _ => crate::interpreter::bail_runtime_error!("Unknown method '{name}' for {} object", core::any::type_name::<Self>()),
             }
         }
 

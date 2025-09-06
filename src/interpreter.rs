@@ -1,4 +1,5 @@
-use std::cell::RefCell;
+use std::borrow::Cow;
+use std::cell::{Ref, RefCell};
 use std::collections::HashMap;
 use std::env;
 use std::path::PathBuf;
@@ -8,6 +9,7 @@ use crate::parser::{BinaryOperator, Statement, UnaryOperator, Value as AstValue}
 
 mod builtins;
 
+use as_any::Downcast;
 use builtins::build_target::{executable, static_library};
 use builtins::config_data::{configuration_data, configure_file};
 use builtins::env::environment;
@@ -37,19 +39,19 @@ pub enum Value {
 }
 
 impl Value {
-    fn to_string(&self) -> String {
+    fn coerce_string(&self) -> String {
         match self {
             Value::String(s) => s.clone(),
             Value::Integer(i) => i.to_string(),
             Value::Boolean(b) => b.to_string(),
             Value::Array(arr) => {
-                let items: Vec<String> = arr.iter().map(|v| v.to_string()).collect();
+                let items: Vec<String> = arr.iter().map(|v| v.coerce_string()).collect();
                 format!("[{}]", items.join(", "))
             }
             Value::Dict(dict) => {
                 let items: Vec<String> = dict
                     .iter()
-                    .map(|(k, v)| format!("{}: {}", k, v.to_string()))
+                    .map(|(k, v)| format!("{}: {}", k, v.coerce_string()))
                     .collect();
                 format!("{{{}}}", items.join(", "))
             }
@@ -58,7 +60,7 @@ impl Value {
         }
     }
 
-    fn to_bool(&self) -> bool {
+    fn coerce_bool(&self) -> bool {
         match self {
             Value::Boolean(b) => *b,
             Value::Integer(i) => *i != 0,
@@ -70,11 +72,38 @@ impl Value {
         }
     }
 
+    fn as_string(&self) -> Result<&str, InterpreterError> {
+        match self {
+            Value::String(s) => Ok(s.as_str()),
+            _ => bail_type_error!("Expected a string, found {:?}", self),
+        }
+    }
+
+    fn as_object<T: MesonObject>(&self) -> Result<Ref<'_, T>, InterpreterError> {
+        match self {
+            Value::Object(obj) => {
+                let src_typename = obj.borrow().object_type();
+                let dst_typename = std::any::type_name::<T>();
+                borrow_downcast::<T>(obj).with_context_type(|| {
+                    format!("Object type mismatch, expected {dst_typename}, found {src_typename}")
+                })
+            }
+            _ => Err(InterpreterError::TypeError("Expected an object".into())),
+        }
+    }
+
+    fn as_dict(&self) -> Result<&HashMap<String, Value>, InterpreterError> {
+        match self {
+            Value::Dict(d) => Ok(d),
+            _ => bail_type_error!("Expected a dict, found {:?}", self),
+        }
+    }
+
     fn format_string(&self, args: &[Value]) -> String {
-        let mut result = self.to_string();
+        let mut result = self.coerce_string();
         for (i, arg) in args.iter().enumerate() {
             let placeholder = format!("@{}@", i);
-            result = result.replace(&placeholder, &arg.to_string());
+            result = result.replace(&placeholder, &arg.coerce_string());
         }
         result
     }
@@ -90,8 +119,8 @@ impl PartialEq for Value {
             (Value::Dict(a), Value::Dict(b)) => a == b,
             (Value::None, Value::None) => true,
             (Value::Object(a), Value::Object(b)) => a.borrow().is_equal(b),
-            (Value::String(a), b) => a == &b.to_string(),
-            (a, Value::String(b)) => &a.to_string() == b,
+            (Value::String(a), b) => a == &b.coerce_string(),
+            (a, Value::String(b)) => &a.coerce_string() == b,
             _ => false,
         }
     }
@@ -131,30 +160,20 @@ pub trait MesonObject: std::fmt::Debug + as_any::AsAny {
     {
         Value::Object(Rc::new(RefCell::new(self)))
     }
+    fn object_type(&'_ self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
 }
 
-impl dyn MesonObject {
-    fn downcast_ref<T: MesonObject>(&self) -> Result<&T, InterpreterError> {
-        let src_type_name = self.type_name();
-        let dst_type_name = core::any::type_name::<T>();
-        self.as_any().downcast_ref::<T>().ok_or_else(|| {
-            InterpreterError::TypeError(format!(
-                "Expected object of type {dst_type_name}, got {src_type_name}",
-            ))
-        })
+pub fn borrow_downcast<'a, T: MesonObject>(
+    cell: &'a RefCell<dyn MesonObject>,
+) -> Option<Ref<'a, T>> {
+    let r = cell.borrow();
+    if (*r).type_id() == core::any::TypeId::of::<T>() {
+        Some(Ref::map(r, |x| x.downcast_ref::<T>().unwrap()))
+    } else {
+        None
     }
-
-    /*
-    fn downcast_mut<T: MesonObject>(&mut self) -> Result<&mut T, InterpreterError> {
-        let src_type_name = self.type_name();
-        let dst_type_name = core::any::type_name::<T>();
-        self.as_any_mut().downcast_mut::<T>().ok_or_else(|| {
-            InterpreterError::TypeError(format!(
-                "Expected object of type {dst_type_name}, got {src_type_name}",
-            ))
-        })
-    }
-    */
 }
 
 pub struct Interpreter {
@@ -167,10 +186,79 @@ pub struct Interpreter {
 
 #[derive(Debug)]
 pub enum InterpreterError {
-    UndefinedVariable(String),
-    UndefinedFunction(String),
-    TypeError(String),
-    RuntimeError(String),
+    UndefinedVariable(Cow<'static, str>),
+    UndefinedFunction(Cow<'static, str>),
+    TypeError(Cow<'static, str>),
+    RuntimeError(Cow<'static, str>),
+}
+
+macro_rules! bail_type_error {
+    ($msg:expr, $($arg:tt)*) => { return Err(InterpreterError::TypeError(std::borrow::Cow::from(format!($msg, $($arg)*)))) };
+    ($msg:expr) => { return Err(InterpreterError::TypeError(std::borrow::Cow::from(format!($msg)))) };
+    () => { return Err(InterpreterError::TypeError(std::borrow::Cow::from("Type mismatch"))) };
+}
+
+macro_rules! bail_runtime_error {
+    ($msg:expr, $($arg:tt)*) => { return Err(InterpreterError::RuntimeError(std::borrow::Cow::from(format!($msg, $($arg)*)))) };
+    ($msg:expr) => { return Err(InterpreterError::RuntimeError(std::borrow::Cow::from(format!($msg)))) };
+    () => { return Err(InterpreterError::RuntimeError(std::borrow::Cow::from("Runtime error"))) };
+}
+
+pub(crate) use {bail_runtime_error, bail_type_error};
+
+trait ErrorContext: Sized {
+    type Ok;
+    fn context_type(self, msg: impl Into<Cow<'static, str>>) -> Result<Self::Ok, InterpreterError> {
+        self.with_context_type(|| msg)
+    }
+    fn context_runtime(
+        self,
+        msg: impl Into<Cow<'static, str>>,
+    ) -> Result<Self::Ok, InterpreterError> {
+        self.with_context_runtime(|| msg)
+    }
+    fn with_context_type<R: Into<Cow<'static, str>>>(
+        self,
+        f: impl FnOnce() -> R,
+    ) -> Result<Self::Ok, InterpreterError>;
+    fn with_context_runtime<R: Into<Cow<'static, str>>>(
+        self,
+        f: impl FnOnce() -> R,
+    ) -> Result<Self::Ok, InterpreterError>;
+}
+
+impl<T, E: std::error::Error> ErrorContext for Result<T, E> {
+    type Ok = T;
+    fn with_context_type<R: Into<Cow<'static, str>>>(
+        self,
+        f: impl FnOnce() -> R,
+    ) -> Result<T, InterpreterError> {
+        self.map_err(|e| InterpreterError::TypeError(Cow::from(format!("{}: {}", f().into(), e))))
+    }
+    fn with_context_runtime<R: Into<Cow<'static, str>>>(
+        self,
+        f: impl FnOnce() -> R,
+    ) -> Result<T, InterpreterError> {
+        self.map_err(|e| {
+            InterpreterError::RuntimeError(Cow::from(format!("{}: {}", f().into(), e)))
+        })
+    }
+}
+
+impl<T> ErrorContext for Option<T> {
+    type Ok = T;
+    fn with_context_type<R: Into<Cow<'static, str>>>(
+        self,
+        f: impl FnOnce() -> R,
+    ) -> Result<T, InterpreterError> {
+        self.ok_or_else(|| InterpreterError::TypeError(Cow::from(format!("{}", f().into()))))
+    }
+    fn with_context_runtime<R: Into<Cow<'static, str>>>(
+        self,
+        f: impl FnOnce() -> R,
+    ) -> Result<T, InterpreterError> {
+        self.ok_or_else(|| InterpreterError::RuntimeError(Cow::from(format!("{}", f().into()))))
+    }
 }
 
 impl std::fmt::Display for InterpreterError {
@@ -259,13 +347,13 @@ impl Interpreter {
             }
             Statement::If(condition, then_branch, elif_branches, else_branch) => {
                 let cond_value = self.evaluate_value(condition)?;
-                if cond_value.to_bool() {
+                if cond_value.coerce_bool() {
                     self.execute_block(then_branch)?;
                 } else {
                     let mut executed = false;
                     for (elif_cond, elif_body) in elif_branches {
                         let elif_value = self.evaluate_value(elif_cond)?;
-                        if elif_value.to_bool() {
+                        if elif_value.coerce_bool() {
                             self.execute_block(elif_body)?;
                             executed = true;
                             break;
@@ -311,9 +399,7 @@ impl Interpreter {
                         }
                     }
                     _ => {
-                        return Err(InterpreterError::TypeError(
-                            "Cannot iterate over non-iterable".to_string(),
-                        ));
+                        bail_type_error!("Cannot iterate over non-iterable");
                     }
                 }
             }
@@ -361,7 +447,7 @@ impl Interpreter {
                 .variables
                 .get(&name)
                 .cloned()
-                .ok_or(InterpreterError::UndefinedVariable(name)),
+                .ok_or(InterpreterError::UndefinedVariable(name.into())),
             AstValue::FunctionCall(name, args, kwargs) => self.call_function(&name, args, kwargs),
             AstValue::MethodCall(object, method, args, kwargs) => {
                 let obj = self.evaluate_value(*object)?;
@@ -383,7 +469,7 @@ impl Interpreter {
             }
             AstValue::TernaryOp(condition, true_val, false_val) => {
                 let cond = self.evaluate_value(*condition)?;
-                if cond.to_bool() {
+                if cond.coerce_bool() {
                     self.evaluate_value(*true_val)
                 } else {
                     self.evaluate_value(*false_val)
@@ -414,18 +500,14 @@ impl Interpreter {
             "project" => {
                 // Project definition
                 let Some(Value::String(_project_name)) = eval_args.first() else {
-                    return Err(InterpreterError::TypeError(
-                        "First argument to project must be a string".to_string(),
-                    ));
+                    bail_type_error!("First argument to project must be a string");
                 };
 
                 let project_version = match eval_kwargs.get("version") {
                     Some(Value::String(v)) => v.clone(),
                     None => "0.0.0".to_string(),
                     Some(_) => {
-                        return Err(InterpreterError::TypeError(
-                            "Expected 'version' keyword argument to be a string".into(),
-                        ));
+                        bail_type_error!("Expected 'version' keyword argument to be a string");
                     }
                 };
 
@@ -437,9 +519,9 @@ impl Interpreter {
                 if let Some(Value::String(opt)) = eval_args.first() {
                     // Set an option
                     let Some(Value::String(ty)) = eval_kwargs.get("type").cloned() else {
-                        return Err(InterpreterError::TypeError(
-                            "Option requires a 'type' keyword argument of type string".to_string(),
-                        ));
+                        bail_type_error!(
+                            "Option requires a 'type' keyword argument of type string"
+                        );
                     };
                     let value = eval_kwargs.get("value");
                     let opt = opt.clone();
@@ -448,11 +530,7 @@ impl Interpreter {
                             let bool_value = match value {
                                 Some(Value::Boolean(v)) => *v,
                                 None => false,
-                                _ => {
-                                    return Err(InterpreterError::TypeError(
-                                        "Boolean option requires a boolean value".to_string(),
-                                    ));
-                                }
+                                _ => bail_type_error!("Boolean option requires a boolean value"),
                             };
                             self.options.insert(opt, Value::Boolean(bool_value));
                         }
@@ -460,11 +538,7 @@ impl Interpreter {
                             let string_value = match value {
                                 Some(Value::String(v)) => v.clone(),
                                 None => "".to_string(),
-                                _ => {
-                                    return Err(InterpreterError::TypeError(
-                                        "String option requires a string value".to_string(),
-                                    ));
-                                }
+                                _ => bail_type_error!("String option requires a string value"),
                             };
                             self.options.insert(opt, Value::String(string_value));
                         }
@@ -472,11 +546,7 @@ impl Interpreter {
                             let int_value = match value {
                                 Some(Value::Integer(v)) => *v,
                                 None => 0,
-                                _ => {
-                                    return Err(InterpreterError::TypeError(
-                                        "Integer option requires an integer value".to_string(),
-                                    ));
-                                }
+                                _ => bail_type_error!("Integer option requires an integer value"),
                             };
                             self.options.insert(opt, Value::Integer(int_value));
                         }
@@ -484,26 +554,15 @@ impl Interpreter {
                             let arr_value = match value {
                                 Some(Value::Array(v)) => v.clone(),
                                 None => vec![],
-                                _ => {
-                                    return Err(InterpreterError::TypeError(
-                                        "Array option requires an array value".to_string(),
-                                    ));
-                                }
+                                _ => bail_type_error!("Array option requires an array value"),
                             };
                             self.options.insert(opt, Value::Array(arr_value));
                         }
-                        _ => {
-                            return Err(InterpreterError::TypeError(format!(
-                                "Unsupported option type: {}",
-                                ty
-                            )));
-                        }
+                        ty => bail_type_error!("Unsupported option type: {ty}"),
                     }
                     Ok(Value::None)
                 } else {
-                    Err(InterpreterError::TypeError(
-                        "First argument to option must be a string".to_string(),
-                    ))
+                    bail_type_error!("First argument to option must be a string");
                 }
             }
             "get_option" => {
@@ -525,14 +584,10 @@ impl Interpreter {
             "run_command" => run_command(eval_args, eval_kwargs),
             "set_variable" => {
                 if eval_args.len() != 2 {
-                    return Err(InterpreterError::RuntimeError(
-                        "set_variable requires 2 arguments".to_string(),
-                    ));
+                    bail_runtime_error!("set_variable requires 2 arguments");
                 }
                 let Some(Value::String(name)) = eval_args.first() else {
-                    return Err(InterpreterError::TypeError(
-                        "First argument to set_variable must be a string".to_string(),
-                    ));
+                    bail_type_error!("First argument to set_variable must be a string");
                 };
                 let value = eval_args.get(1).unwrap_or(&Value::None).cloned();
                 self.variables.insert(name.clone(), value);
@@ -553,13 +608,13 @@ impl Interpreter {
                         Some(value) => Ok(value.clone()),
                         None => match eval_args.get(1).cloned() {
                             Some(v) => Ok(v),
-                            None => Err(InterpreterError::UndefinedVariable(var.clone())),
+                            None => {
+                                Err(InterpreterError::UndefinedVariable(var.to_string().into()))
+                            }
                         },
                     }
                 } else {
-                    Err(InterpreterError::TypeError(
-                        "First argument to get_variable must be a string".to_string(),
-                    ))
+                    bail_type_error!("First argument to get_variable must be a string");
                 }
             }
             "include_directories" => include_directories(eval_args, eval_kwargs),
@@ -571,9 +626,7 @@ impl Interpreter {
             "files" => files(eval_args, eval_kwargs),
             "subdir" => {
                 let Some(Value::String(dir)) = eval_args.first() else {
-                    return Err(InterpreterError::TypeError(
-                        "First argument to subdir must be a string".to_string(),
-                    ));
+                    bail_type_error!("First argument to subdir must be a string");
                 };
                 let pwd = env::current_dir().unwrap();
                 struct Restore(PathBuf);
@@ -583,38 +636,26 @@ impl Interpreter {
                     }
                 }
                 let _restore = Restore(pwd.clone());
-                env::set_current_dir(dir).map_err(|e| {
-                    InterpreterError::RuntimeError(format!("Failed to enter subdir {}: {}", dir, e))
-                })?;
-                let meson_code = std::fs::read_to_string("meson.build").map_err(|e| {
-                    InterpreterError::RuntimeError(format!(
-                        "Failed to read meson.build in subdir {}: {}",
-                        dir, e
-                    ))
-                })?;
-                match crate::parser::parse_meson_file(&meson_code) {
-                    Ok(statements) => {
-                        self.interpret(statements)?;
-                    }
-                    Err(e) => {
-                        return Err(InterpreterError::RuntimeError(format!(
-                            "Failed to parse meson.build in subdir {}: {}",
-                            dir, e
-                        )));
-                    }
-                }
-                // TODO: Implement subdir handling
+                env::set_current_dir(dir)
+                    .with_context_runtime(|| format!("Failed to change directory to {}", dir))?;
+                let meson_code =
+                    std::fs::read_to_string("meson.build").with_context_runtime(|| {
+                        format!("Failed to read meson.build in subdir {}", dir)
+                    })?;
+                let statements = crate::parser::parse_meson_file(&meson_code)
+                    .with_context_runtime(|| {
+                        format!("Failed to parse meson.build in subdir {}", dir)
+                    })?;
+                self.interpret(statements)?;
                 Ok(Value::None)
             }
             "environment" => environment(eval_args, eval_kwargs),
             "join_paths" => {
                 let mut path = PathBuf::new();
                 for part in &eval_args {
-                    let Value::String(part) = part else {
-                        return Err(InterpreterError::TypeError(
-                            "All arguments to join_paths must be strings".to_string(),
-                        ));
-                    };
+                    let part = part
+                        .as_string()
+                        .context_type("All arguments to join_paths must be strings")?;
                     path.push(part);
                 }
                 // Path joining in Meson
@@ -630,24 +671,22 @@ impl Interpreter {
             "install_headers" => install_headers(eval_args, eval_kwargs),
             "assert" => {
                 let Some(Value::Boolean(cond)) = eval_args.first() else {
-                    return Err(InterpreterError::TypeError(
-                        "First argument to assert must be a boolean".to_string(),
-                    ));
+                    bail_type_error!("First argument to assert must be a boolean");
                 };
                 if !cond {
                     let msg = if eval_args.len() >= 2 {
-                        let msg = eval_args[1].to_string();
+                        let msg = eval_args[1].coerce_string();
                         format!("Assertion failed: {}", msg.trim_matches('"'))
                     } else {
                         "Assertion failed".to_string()
                     };
-                    return Err(InterpreterError::RuntimeError(msg));
+                    bail_runtime_error!("Assert failure: {msg}");
                 }
                 Ok(Value::None)
             }
             "message" => {
                 for arg in eval_args {
-                    print!("{} ", arg.to_string());
+                    print!("{} ", arg.coerce_string());
                 }
                 println!();
                 Ok(Value::None)
@@ -655,20 +694,20 @@ impl Interpreter {
             "error" => {
                 let msg = eval_args
                     .iter()
-                    .map(|v| v.to_string())
+                    .map(|v| v.coerce_string())
                     .collect::<Vec<_>>()
                     .join(" ");
-                Err(InterpreterError::RuntimeError(msg))
+                bail_runtime_error!("{msg}");
             }
             "warning" => {
                 print!("WARNING: ");
                 for arg in eval_args {
-                    print!("{} ", arg.to_string());
+                    print!("{} ", arg.coerce_string());
                 }
                 println!();
                 Ok(Value::None)
             }
-            _ => Err(InterpreterError::UndefinedFunction(name.to_string())),
+            _ => Err(InterpreterError::UndefinedFunction(name.to_string().into())),
         }
     }
 
@@ -716,7 +755,7 @@ impl Interpreter {
                 "join" => {
                     let result = eval_args
                         .iter()
-                        .map(|v| v.to_string())
+                        .map(|v| v.coerce_string())
                         .collect::<Vec<_>>()
                         .join(s);
                     Ok(Value::String(result))
@@ -777,10 +816,7 @@ impl Interpreter {
                 }
                 "to_upper" => Ok(Value::String(s.to_uppercase())),
                 "to_lower" => Ok(Value::String(s.to_lowercase())),
-                _ => Err(InterpreterError::RuntimeError(format!(
-                    "Unknown method '{}' for string",
-                    method
-                ))),
+                _ => bail_runtime_error!("Unknown method '{method}' for string"),
             },
             Value::Array(ref arr) => match method {
                 "get" => {
@@ -811,10 +847,7 @@ impl Interpreter {
                     }
                 }
                 "length" => Ok(Value::Integer(arr.len() as i64)),
-                _ => Err(InterpreterError::RuntimeError(format!(
-                    "Unknown method '{}' for array",
-                    method
-                ))),
+                _ => bail_runtime_error!("Unknown method '{method}' for array"),
             },
             Value::Dict(ref dict) => match method {
                 "get" => {
@@ -845,19 +878,13 @@ impl Interpreter {
                     let values: Vec<Value> = dict.values().cloned().collect();
                     Ok(Value::Array(values))
                 }
-                _ => Err(InterpreterError::RuntimeError(format!(
-                    "Unknown method '{}' for dict",
-                    method
-                ))),
+                _ => bail_runtime_error!("Unknown method '{method}' for dict"),
             },
             Value::Object(ref obj) => {
                 let mut obj = obj.as_ref().borrow_mut();
                 obj.call_method(method, eval_args, eval_kwargs)
             }
-            _ => Err(InterpreterError::TypeError(format!(
-                "Cannot call method '{}' on {:?}",
-                method, object
-            ))),
+            _ => bail_type_error!("Cannot call method '{method}' on {object:?}"),
         }
     }
 
@@ -871,26 +898,20 @@ impl Interpreter {
             BinaryOperator::Add => self.add_values(&left, &right),
             BinaryOperator::Sub => match (left, right) {
                 (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a - b)),
-                _ => Err(InterpreterError::TypeError(
-                    "Cannot subtract non-integers".to_string(),
-                )),
+                _ => bail_type_error!("Cannot subtract non-integers"),
             },
             BinaryOperator::Mul => match (left, right) {
                 (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a * b)),
                 (Value::String(s), Value::Integer(n)) | (Value::Integer(n), Value::String(s)) => {
                     Ok(Value::String(s.repeat(n as usize)))
                 }
-                _ => Err(InterpreterError::TypeError(
-                    "Invalid operands for multiplication".to_string(),
-                )),
+                _ => bail_type_error!("Invalid operands for multiplication"),
             },
             BinaryOperator::Div => {
                 match (&left, &right) {
                     (Value::Integer(a), Value::Integer(b)) => {
                         if *b == 0 {
-                            Err(InterpreterError::RuntimeError(
-                                "Division by zero".to_string(),
-                            ))
+                            bail_runtime_error!("Division by zero");
                         } else {
                             Ok(Value::Integer(a / b))
                         }
@@ -900,55 +921,43 @@ impl Interpreter {
                         let path = PathBuf::from(s).join(sep);
                         Ok(Value::String(path.to_string_lossy().to_string()))
                     }
-                    _ => Err(InterpreterError::TypeError(
-                        "Invalid operands for division".to_string(),
-                    )),
+                    _ => bail_type_error!("Invalid operands for division"),
                 }
             }
             BinaryOperator::Mod => match (left, right) {
                 (Value::Integer(a), Value::Integer(b)) => {
                     if b == 0 {
-                        Err(InterpreterError::RuntimeError("Modulo by zero".to_string()))
+                        bail_runtime_error!("Modulo by zero");
                     } else {
                         Ok(Value::Integer(a % b))
                     }
                 }
-                _ => Err(InterpreterError::TypeError(
-                    "Cannot modulo non-integers".to_string(),
-                )),
+                _ => bail_type_error!("Cannot modulo non-integers"),
             },
             BinaryOperator::Eq => Ok(Value::Boolean(left == right)),
             BinaryOperator::Ne => Ok(Value::Boolean(left != right)),
             BinaryOperator::Lt => match (left, right) {
                 (Value::Integer(a), Value::Integer(b)) => Ok(Value::Boolean(a < b)),
                 (Value::String(a), Value::String(b)) => Ok(Value::Boolean(a < b)),
-                _ => Err(InterpreterError::TypeError(
-                    "Cannot compare incompatible types".to_string(),
-                )),
+                _ => bail_type_error!("Cannot compare incompatible types"),
             },
             BinaryOperator::Le => match (left, right) {
                 (Value::Integer(a), Value::Integer(b)) => Ok(Value::Boolean(a <= b)),
                 (Value::String(a), Value::String(b)) => Ok(Value::Boolean(a <= b)),
-                _ => Err(InterpreterError::TypeError(
-                    "Cannot compare incompatible types".to_string(),
-                )),
+                _ => bail_type_error!("Cannot compare incompatible types"),
             },
             BinaryOperator::Gt => match (left, right) {
                 (Value::Integer(a), Value::Integer(b)) => Ok(Value::Boolean(a > b)),
                 (Value::String(a), Value::String(b)) => Ok(Value::Boolean(a > b)),
-                _ => Err(InterpreterError::TypeError(
-                    "Cannot compare incompatible types".to_string(),
-                )),
+                _ => bail_type_error!("Cannot compare incompatible types"),
             },
             BinaryOperator::Ge => match (left, right) {
                 (Value::Integer(a), Value::Integer(b)) => Ok(Value::Boolean(a >= b)),
                 (Value::String(a), Value::String(b)) => Ok(Value::Boolean(a >= b)),
-                _ => Err(InterpreterError::TypeError(
-                    "Cannot compare incompatible types".to_string(),
-                )),
+                _ => bail_type_error!("Cannot compare incompatible types"),
             },
-            BinaryOperator::And => Ok(Value::Boolean(left.to_bool() && right.to_bool())),
-            BinaryOperator::Or => Ok(Value::Boolean(left.to_bool() || right.to_bool())),
+            BinaryOperator::And => Ok(Value::Boolean(left.coerce_bool() && right.coerce_bool())),
+            BinaryOperator::Or => Ok(Value::Boolean(left.coerce_bool() || right.coerce_bool())),
             BinaryOperator::In => match right {
                 Value::Array(arr) => Ok(Value::Boolean(arr.contains(&left))),
                 Value::String(s) => {
@@ -990,12 +999,10 @@ impl Interpreter {
 
     fn apply_unary_op(&self, op: UnaryOperator, value: Value) -> Result<Value, InterpreterError> {
         match op {
-            UnaryOperator::Not => Ok(Value::Boolean(!value.to_bool())),
+            UnaryOperator::Not => Ok(Value::Boolean(!value.coerce_bool())),
             UnaryOperator::Minus => match value {
                 Value::Integer(i) => Ok(Value::Integer(-i)),
-                _ => Err(InterpreterError::TypeError(
-                    "Cannot negate non-integer".to_string(),
-                )),
+                _ => bail_type_error!("Cannot negate non-integer"),
             },
         }
     }
@@ -1010,24 +1017,18 @@ impl Interpreter {
                         idx as usize
                     };
 
-                    arr.get(idx).cloned().ok_or_else(|| {
-                        InterpreterError::RuntimeError("Index out of bounds".to_string())
-                    })
+                    arr.get(idx).cloned().context_runtime("Index out of bounds")
                 } else {
-                    Err(InterpreterError::TypeError(
-                        "Array index must be integer".to_string(),
-                    ))
+                    bail_type_error!("Array index must be integer")
                 }
             }
             Value::Dict(dict) => {
                 if let Value::String(key) = index {
-                    dict.get(&key).cloned().ok_or_else(|| {
-                        InterpreterError::RuntimeError(format!("Key '{}' not found", key))
-                    })
+                    dict.get(&key)
+                        .cloned()
+                        .context_runtime(format!("Key '{}' not found", key))
                 } else {
-                    Err(InterpreterError::TypeError(
-                        "Dictionary key must be string".to_string(),
-                    ))
+                    bail_type_error!("Dictionary key must be string")
                 }
             }
             Value::String(s) => {
@@ -1041,18 +1042,12 @@ impl Interpreter {
                     s.chars()
                         .nth(idx)
                         .map(|c| Value::String(c.to_string()))
-                        .ok_or_else(|| {
-                            InterpreterError::RuntimeError("Index out of bounds".to_string())
-                        })
+                        .context_runtime("String index out of bounds")
                 } else {
-                    Err(InterpreterError::TypeError(
-                        "String index must be integer".to_string(),
-                    ))
+                    bail_type_error!("String index must be integer")
                 }
             }
-            _ => Err(InterpreterError::TypeError(
-                "Cannot subscript this type".to_string(),
-            )),
+            _ => bail_type_error!("Cannot subscript this type"),
         }
     }
 
@@ -1070,9 +1065,7 @@ impl Interpreter {
                 result.push(b.clone());
                 Ok(Value::Array(result))
             }
-            _ => Err(InterpreterError::TypeError(format!(
-                "Cannot add incompatible types {left:?} + {right:?}"
-            ))),
+            _ => bail_type_error!("Cannot add incompatible types {left:?} + {right:?}"),
         }
     }
 }

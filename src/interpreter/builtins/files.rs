@@ -5,7 +5,7 @@ use std::slice::Iter;
 
 use crate::interpreter::builtins::builtin_impl;
 use crate::interpreter::builtins::utils::flatten;
-use crate::interpreter::{InterpreterError, MesonObject, Value};
+use crate::interpreter::{InterpreterError, MesonObject, Value, bail_type_error};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct File {
@@ -22,19 +22,17 @@ pub(super) fn files_impl<'a>(
 ) -> Result<Vec<File>, InterpreterError> {
     let pwd = env::current_dir().unwrap();
     flatten(args)
-        .map(|arg| match arg {
-            Value::String(s) => Ok(File {
-                pwd: pwd.clone(),
-                path: PathBuf::from(s),
-            }),
-            Value::Object(obj) => {
-                let file = obj.borrow();
-                let file = file.downcast_ref::<File>()?;
+        .map(|arg| {
+            if let Ok(s) = arg.as_string() {
+                Ok(File {
+                    pwd: pwd.clone(),
+                    path: PathBuf::from(s),
+                })
+            } else if let Ok(file) = arg.as_object::<File>() {
                 Ok(file.clone())
+            } else {
+                bail_type_error!("Expected arguments to be strings or File objects, got {arg:?}")
             }
-            _ => Err(InterpreterError::TypeError(format!(
-                "Expected arguments to be strings or File objects, got {arg:?}",
-            ))),
         })
         .collect::<Result<Vec<_>, _>>()
 }

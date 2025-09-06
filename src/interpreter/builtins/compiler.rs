@@ -5,7 +5,9 @@ use tempfile::tempdir;
 
 use super::builtin_impl;
 use crate::interpreter::builtins::utils::flatten;
-use crate::interpreter::{InterpreterError, MesonObject, Value};
+use crate::interpreter::{
+    ErrorContext as _, InterpreterError, MesonObject, Value, bail_runtime_error, bail_type_error,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Compiler {
@@ -63,17 +65,13 @@ impl Compiler {
         kwargs: HashMap<String, Value>,
     ) -> Result<Value, InterpreterError> {
         let Some(Value::String(argument)) = args.first() else {
-            return Err(InterpreterError::RuntimeError(
-                "has_argument requires a string argument".to_string(),
-            ));
+            bail_type_error!("has_argument requires a string argument");
         };
         let required = match kwargs.get("required") {
             Some(Value::Boolean(val)) => *val,
             None => false,
             _ => {
-                return Err(InterpreterError::TypeError(
-                    "The 'required' keyword argument must be a boolean".into(),
-                ));
+                bail_type_error!("The 'required' keyword argument must be a boolean");
             }
         };
 
@@ -83,9 +81,7 @@ impl Compiler {
         if supported || !required {
             Ok(Value::Boolean(supported))
         } else {
-            Err(InterpreterError::RuntimeError(format!(
-                "Compiler does not support argument: {argument}",
-            )))
+            bail_runtime_error!("Compiler does not support argument: {argument}");
         }
     }
 
@@ -95,11 +91,9 @@ impl Compiler {
         _kwargs: HashMap<String, Value>,
     ) -> Result<Value, InterpreterError> {
         let args = flatten(&args)
-            .map(|v| match v {
-                Value::String(s) => Ok(s),
-                _ => Err(InterpreterError::TypeError(format!(
-                    "Expected arguments to be strings, found {v:?}"
-                ))),
+            .map(|v| {
+                v.as_string()
+                    .context_type("Expected arguments to be strings")
             })
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -109,7 +103,7 @@ impl Compiler {
                 Ok(TryCompileResult { success, .. }) => success.then_some(Ok(arg)),
                 Err(e) => Some(Err(e)),
             })
-            .map(|arg| arg.cloned().map(Value::String))
+            .map(|arg| arg.map(|v| Value::String(v.to_string())))
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(Value::Array(args))
@@ -121,9 +115,7 @@ impl Compiler {
         kwargs: HashMap<String, Value>,
     ) -> Result<Value, InterpreterError> {
         let Some(Value::String(function)) = args.first() else {
-            return Err(InterpreterError::RuntimeError(
-                "has_function requires a string argument".to_string(),
-            ));
+            bail_type_error!("has_function requires a string argument");
         };
 
         let extra_args = get_extra_args(&kwargs)?;
@@ -141,9 +133,7 @@ impl Compiler {
         _kwargs: HashMap<String, Value>,
     ) -> Result<Value, InterpreterError> {
         let Some(Value::String(argument)) = args.first() else {
-            return Err(InterpreterError::RuntimeError(
-                "has_link_argument requires a string argument".to_string(),
-            ));
+            bail_type_error!("has_link_argument requires a string argument");
         };
 
         let code = "int main() { return 0; }";
@@ -159,11 +149,9 @@ impl Compiler {
         _kwargs: HashMap<String, Value>,
     ) -> Result<Value, InterpreterError> {
         let args = flatten(&args)
-            .map(|v| match v {
-                Value::String(s) => Ok(s.as_str()),
-                _ => Err(InterpreterError::TypeError(format!(
-                    "Expected arguments to be strings, found {v:?}"
-                ))),
+            .map(|v| {
+                v.as_string()
+                    .context_type("Expected arguments to be strings")
             })
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -232,9 +220,7 @@ void {symbol_name}(void) {{}}
         kwargs: HashMap<String, Value>,
     ) -> Result<Value, InterpreterError> {
         let Some(Value::String(code)) = args.first() else {
-            return Err(InterpreterError::RuntimeError(
-                "compiles requires a string argument".to_string(),
-            ));
+            bail_type_error!("compiles requires a string argument");
         };
 
         let extra_args = get_extra_args(&kwargs)?;
@@ -250,9 +236,7 @@ void {symbol_name}(void) {{}}
         kwargs: HashMap<String, Value>,
     ) -> Result<Value, InterpreterError> {
         let Some(Value::String(code)) = args.first() else {
-            return Err(InterpreterError::RuntimeError(
-                "links requires a string argument".to_string(),
-            ));
+            bail_type_error!("links requires a string argument");
         };
 
         let extra_args = get_extra_args(&kwargs)?;
@@ -270,9 +254,7 @@ void {symbol_name}(void) {{}}
     ) -> Result<TryCompileResult, InterpreterError> {
         use std::io::Write;
 
-        let tmp_dir = tempdir().map_err(|e| {
-            InterpreterError::RuntimeError(format!("Failed to create temporary directory: {}", e))
-        })?;
+        let tmp_dir = tempdir().context_runtime("Failed to create temporary directory")?;
 
         let Some(arg0) = self.command.first() else {
             return Err(InterpreterError::RuntimeError(
@@ -292,22 +274,18 @@ void {symbol_name}(void) {{}}
             .stdout(Stdio::null())
             .stderr(Stdio::null());
 
-        let mut child = cmd.spawn().map_err(|e| {
-            InterpreterError::RuntimeError(format!("Failed to run compiler: {}", e))
-        })?;
+        let mut child = cmd.spawn().context_runtime("Failed to run compiler")?;
 
         child
             .stdin
             .take()
             .unwrap()
             .write_all(code.as_bytes())
-            .map_err(|e| {
-                InterpreterError::RuntimeError(format!("Failed to run compiler: {}", e))
-            })?;
+            .context_runtime("Failed to write to compiler stdin")?;
 
-        let output = child.wait_with_output().map_err(|e| {
-            InterpreterError::RuntimeError(format!("Failed to run compiler: {}", e))
-        })?;
+        let output = child
+            .wait_with_output()
+            .context_runtime("Failed to run compiler")?;
 
         let artifact = std::fs::read(&out_path).unwrap_or_default();
         let success = output.status.success();
@@ -360,8 +338,6 @@ pub fn get_compiler(
             let command = vec![command];
             Ok(Compiler { command }.into_object())
         }
-        lang => Err(InterpreterError::RuntimeError(format!(
-            "Unsupported language '{lang}'"
-        ))),
+        lang => bail_runtime_error!("Unsupported language '{lang}'"),
     }
 }

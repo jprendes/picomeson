@@ -51,9 +51,9 @@ pub fn run_command(
             Value::String(s) => Some(Ok(s.as_str())),
             // TODO: this is because we don't have a default option c_args
             Value::None => None,
-            _ => Some(Err(InterpreterError::TypeError(format!(
-                "Expected arguments to be strings, found {v:?}"
-            )))),
+            _ => Some(Err(InterpreterError::RuntimeError(
+                format!("Expected arguments to be strings, found {v:?}").into(),
+            ))),
         })
         .collect::<Result<Vec<_>, _>>()?;
 

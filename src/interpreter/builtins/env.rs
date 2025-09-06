@@ -3,7 +3,7 @@ use std::env;
 
 use super::builtin_impl;
 use crate::interpreter::builtins::utils::flatten;
-use crate::interpreter::{InterpreterError, MesonObject, Value};
+use crate::interpreter::{ErrorContext, InterpreterError, MesonObject, Value};
 
 #[derive(Debug, Clone, PartialEq)]
 struct Env {
@@ -20,12 +20,7 @@ impl Env {
         args: Vec<Value>,
         kwargs: HashMap<String, Value>,
     ) -> Result<Value, InterpreterError> {
-        let mut args = flatten(&args).map(|v| match v {
-            Value::String(s) => Ok(s.as_str()),
-            _ => Err(InterpreterError::TypeError(format!(
-                "Expected arguments to be strings, found {v:?}"
-            ))),
-        });
+        let mut args = flatten(&args).map(|v| v.as_string());
 
         let separator = match kwargs.get("separator") {
             Some(Value::String(s)) => Some(s.as_str()),
@@ -55,7 +50,7 @@ impl Env {
             values.join(sep)
         } else {
             env::join_paths(values)
-                .map_err(|e| InterpreterError::RuntimeError(format!("Failed to join values: {e}")))?
+                .context_runtime("msg Failed to join values")?
                 .to_string_lossy()
                 .into_owned()
         };

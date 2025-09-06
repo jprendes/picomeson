@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
 use super::builtin_impl;
-use crate::interpreter::{InterpreterError, MesonObject, Value};
+use crate::interpreter::{
+    ErrorContext, InterpreterError, MesonObject, Value, bail_runtime_error, bail_type_error,
+};
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ConfigData {
@@ -9,14 +11,6 @@ pub struct ConfigData {
 }
 
 impl ConfigData {
-    fn from_dict(dict: HashMap<String, Value>) -> Self {
-        let data = dict
-            .into_iter()
-            .map(|(k, v)| (k, (v, String::new())))
-            .collect();
-        Self { data }
-    }
-
     fn get(
         &self,
         args: Vec<Value>,
@@ -30,9 +24,7 @@ impl ConfigData {
 
         match self.data.get(key) {
             Some((value, _)) => Ok(value.clone()),
-            None => Err(InterpreterError::RuntimeError(format!(
-                "Key '{key}' not found in ConfigData"
-            ))),
+            None => bail_runtime_error!("Key '{key}' not found in ConfigData"),
         }
     }
 
@@ -90,9 +82,7 @@ impl ConfigData {
                 *v = Value::Integer(1);
             }
             _ => {
-                return Err(InterpreterError::TypeError(
-                    "Expected int or bool as the second argument".into(),
-                ));
+                bail_type_error!("Expected int or bool as the second argument");
             }
         }
         self.set(args, kwargs)
@@ -103,16 +93,19 @@ impl ConfigData {
         args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
     ) -> Result<Value, InterpreterError> {
-        let other = match args.first() {
-            Some(Value::Object(other)) => other.borrow().downcast_ref::<ConfigData>()?.clone(),
-            Some(Value::Dict(dict)) => ConfigData::from_dict(dict.clone()),
-            _ => {
-                return Err(InterpreterError::TypeError(
-                    "merge_from requires a ConfigData object or a dict".to_string(),
-                ));
-            }
+        let other = args.first().context_type(
+            "merge_from requires a ConfigData object or a dict as the first argument",
+        )?;
+        if let Ok(other) = other.as_object::<ConfigData>() {
+            self.data.extend(other.data.clone());
+        } else if let Ok(dict) = other.as_dict() {
+            let iter = dict
+                .iter()
+                .map(|(k, v)| (k.clone(), (v.clone(), String::new())));
+            self.data.extend(iter);
+        } else {
+            bail_type_error!("merge_from requires a ConfigData object or a dict");
         };
-        self.data.extend(other.data);
         Ok(Value::None)
     }
 }
@@ -128,36 +121,22 @@ pub fn configure_file(
     let input = match kwargs.get("input") {
         Some(Value::String(s)) => Some(s.clone()),
         None => None,
-        _ => {
-            return Err(InterpreterError::TypeError(
-                "configure_file 'input' keyword argument must be a string".to_string(),
-            ));
-        }
+        _ => bail_type_error!("configure_file 'input' keyword argument must be a string"),
     };
-
     let Some(Value::String(output)) = kwargs.get("output") else {
-        return Err(InterpreterError::TypeError(
-            "configure_file requires an 'output' keyword argument of type string".to_string(),
-        ));
+        bail_type_error!("configure_file requires an 'output' keyword argument of type string");
     };
-
-    let Some(Value::Object(configuration)) = kwargs.get("configuration") else {
-        return Err(InterpreterError::TypeError(
-            "configure_file requires a 'configuration' keyword argument of type ConfigData"
-                .to_string(),
-        ));
-    };
-
-    let configuration = configuration.borrow();
-    let configuration = configuration.downcast_ref::<ConfigData>()?;
-
+    let configuration = kwargs
+        .get("configuration")
+        .context_type(
+            "configure_file requires a 'configuration' keyword argument of type ConfigData",
+        )?
+        .as_object::<ConfigData>()?;
     if input.is_some() {
         // TODO: implement this
         return Ok(Value::None);
     }
-
     let mut content = String::from("#pragma once\n\n");
-
     for (key, (value, desc)) in configuration.data.iter() {
         if !desc.is_empty() {
             content.push_str(&format!("// {}\n", desc));
@@ -175,16 +154,10 @@ pub fn configure_file(
             Value::String(s) => {
                 content.push_str(&format!("#define {} {}\n", key, s));
             }
-            v => {
-                Err(InterpreterError::RuntimeError(format!(
-                    "Unsupported value type for key {}: {:?}",
-                    key, v
-                )))?;
-            }
+            v => bail_type_error!("Unsupported value type for key {key}: {v:?}"),
         }
         content.push('\n');
     }
-
     // TODO: Actualy output this file, and handle paths correctly
     println!("Should be writing output file: {}", output);
     println!("With content:\n{}", content);

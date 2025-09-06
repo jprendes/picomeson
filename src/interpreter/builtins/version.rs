@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use super::builtin_impl;
-use crate::interpreter::{InterpreterError, MesonObject, Value};
+use crate::interpreter::{ErrorContext, InterpreterError, MesonObject, Value};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Version {
@@ -20,11 +20,8 @@ impl Version {
             ));
         };
 
-        let req = semver::VersionReq::parse(req).map_err(|e| {
-            InterpreterError::RuntimeError(format!(
-                "Invalid version requirement string '{req}': {e}"
-            ))
-        })?;
+        let req = semver::VersionReq::parse(req)
+            .with_context_runtime(|| format!("Invalid version requirement string '{req}'"))?;
 
         Ok(Value::Boolean(req.matches(&self.version)))
     }
@@ -36,8 +33,7 @@ impl MesonObject for Version {
 
 pub fn version(version: impl AsRef<str>) -> Result<Value, InterpreterError> {
     let version = version.as_ref();
-    let version = semver::Version::parse(version).map_err(|e| {
-        InterpreterError::RuntimeError(format!("Invalid version string '{version}': {e}",))
-    })?;
+    let version = semver::Version::parse(version)
+        .with_context_runtime(|| format!("Invalid version string '{version}'"))?;
     Ok(Version { version }.into_object())
 }

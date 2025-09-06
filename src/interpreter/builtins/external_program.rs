@@ -3,7 +3,9 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use super::builtin_impl;
-use crate::interpreter::{InterpreterError, MesonObject, Value};
+use crate::interpreter::{
+    InterpreterError, MesonObject, Value, bail_runtime_error, bail_type_error,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExternalProgram {
@@ -72,11 +74,7 @@ pub fn find_program(
 
     match kwargs.get("required") {
         None | Some(Value::Boolean(false)) => Ok(program),
-        Some(Value::Boolean(true)) => Err(InterpreterError::RuntimeError(format!(
-            "Program '{prog}' not found",
-        ))),
-        _ => Err(InterpreterError::TypeError(
-            "The 'required' keyword argument must be a boolean".into(),
-        )),
+        Some(Value::Boolean(true)) => bail_runtime_error!("Program '{prog}' not found"),
+        _ => bail_type_error!("The 'required' keyword argument must be a boolean"),
     }
 }
