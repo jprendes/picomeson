@@ -47,14 +47,7 @@ pub fn run_command(
     _kwargs: HashMap<String, Value>,
 ) -> Result<Value, InterpreterError> {
     let cmd_args = flatten(&args)
-        .filter_map(|v| match v {
-            Value::String(s) => Some(Ok(s.as_str())),
-            // TODO: this is because we don't have a default option c_args
-            Value::None => None,
-            _ => Some(Err(InterpreterError::RuntimeError(
-                format!("Expected arguments to be strings, found {v:?}").into(),
-            ))),
-        })
+        .map(Value::as_string)
         .collect::<Result<Vec<_>, _>>()?;
 
     if cmd_args.is_empty() {

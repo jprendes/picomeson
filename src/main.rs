@@ -21,10 +21,17 @@ fn main() {
 
     std::env::set_current_dir(dir).expect("Failed to change directory");
 
+    let builtin_options = include_str!("builtin-options.txt");
     let meson_options = std::fs::read_to_string("meson_options.txt").unwrap_or_default();
     let meson_code = std::fs::read_to_string(file_name).expect("Failed to read Meson file");
 
-    let meson_code = format!("{}\n{}", meson_options, meson_code);
+    let meson_code = format!(
+        "
+{builtin_options}
+{meson_options}
+{meson_code}
+"
+    );
 
     match parser::parse_meson_file(&meson_code) {
         Ok(statements) => {

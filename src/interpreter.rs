@@ -1,10 +1,10 @@
 use alloc::borrow::Cow;
+use alloc::rc::Rc;
 use core::cell::{Ref, RefCell};
+use core::fmt;
 use hashbrown::HashMap;
 use std::env;
 use std::path::PathBuf;
-use alloc::rc::Rc;
-use core::fmt;
 
 use crate::parser::{BinaryOperator, Statement, UnaryOperator, Value as AstValue};
 
@@ -73,10 +73,31 @@ impl Value {
         }
     }
 
+    fn as_bool(&self) -> Result<bool, InterpreterError> {
+        match self {
+            Value::Boolean(b) => Ok(*b),
+            _ => bail_type_error!("Expected a boolean, found {:?}", self),
+        }
+    }
+
     fn as_string(&self) -> Result<&str, InterpreterError> {
         match self {
             Value::String(s) => Ok(s.as_str()),
             _ => bail_type_error!("Expected a string, found {:?}", self),
+        }
+    }
+
+    fn as_array(&self) -> Result<&[Value], InterpreterError> {
+        match self {
+            Value::Array(arr) => Ok(arr.as_slice()),
+            _ => bail_type_error!("Expected an array, found {:?}", self),
+        }
+    }
+
+    fn as_integer(&self) -> Result<i64, InterpreterError> {
+        match self {
+            Value::Integer(i) => Ok(*i),
+            _ => bail_type_error!("Expected an integer, found {:?}", self),
         }
     }
 
@@ -517,54 +538,49 @@ impl Interpreter {
                 Ok(Value::None)
             }
             "option" => {
-                if let Some(Value::String(opt)) = eval_args.first() {
-                    // Set an option
-                    let Some(Value::String(ty)) = eval_kwargs.get("type").cloned() else {
-                        bail_type_error!(
-                            "Option requires a 'type' keyword argument of type string"
-                        );
-                    };
-                    let value = eval_kwargs.get("value");
-                    let opt = opt.clone();
-                    match ty.as_str() {
-                        "boolean" => {
-                            let bool_value = match value {
-                                Some(Value::Boolean(v)) => *v,
-                                None => false,
-                                _ => bail_type_error!("Boolean option requires a boolean value"),
-                            };
-                            self.options.insert(opt, Value::Boolean(bool_value));
-                        }
-                        "string" | "combo" => {
-                            let string_value = match value {
-                                Some(Value::String(v)) => v.clone(),
-                                None => "".to_string(),
-                                _ => bail_type_error!("String option requires a string value"),
-                            };
-                            self.options.insert(opt, Value::String(string_value));
-                        }
-                        "integer" => {
-                            let int_value = match value {
-                                Some(Value::Integer(v)) => *v,
-                                None => 0,
-                                _ => bail_type_error!("Integer option requires an integer value"),
-                            };
-                            self.options.insert(opt, Value::Integer(int_value));
-                        }
-                        "array" => {
-                            let arr_value = match value {
-                                Some(Value::Array(v)) => v.clone(),
-                                None => vec![],
-                                _ => bail_type_error!("Array option requires an array value"),
-                            };
-                            self.options.insert(opt, Value::Array(arr_value));
-                        }
-                        ty => bail_type_error!("Unsupported option type: {ty}"),
+                let opt: String = eval_args
+                    .first()
+                    .context_type("First argument to option must be a string")?
+                    .as_string()?
+                    .into();
+
+                let typ = eval_kwargs
+                    .get("type")
+                    .context_type("Option requires a 'type' keyword argument")?
+                    .as_string()?;
+
+                let value = eval_kwargs.get("value");
+                let value = match typ {
+                    "boolean" => {
+                        let bool_value = value.unwrap_or(&Value::Boolean(true)).as_bool()?;
+                        Value::Boolean(bool_value)
                     }
-                    Ok(Value::None)
-                } else {
-                    bail_type_error!("First argument to option must be a string");
-                }
+                    "integer" => {
+                        let int_value = value.unwrap_or(&Value::Integer(0)).as_integer()?;
+                        Value::Integer(int_value)
+                    }
+                    "string" | "combo" => {
+                        let string_value = value
+                            .unwrap_or(&Value::String(String::new()))
+                            .as_string()?
+                            .into();
+                        Value::String(string_value)
+                    }
+                    "array" => {
+                        let arr_value = value
+                            .unwrap_or(&Value::Array(vec![]))
+                            .as_array()?
+                            .iter()
+                            .map(|v| Ok(Value::String(v.as_string()?.into())))
+                            .collect::<Result<Vec<Value>, _>>()?;
+                        Value::Array(arr_value)
+                    }
+                    ty => bail_type_error!("Unsupported option type: {ty}"),
+                };
+
+                self.options.insert(opt, value);
+
+                Ok(Value::None)
             }
             "get_option" => {
                 if let Some(Value::String(opt)) = eval_args.first() {
