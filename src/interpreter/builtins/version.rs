@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use hashbrown::HashMap;
 
 use super::builtin_impl;
 use crate::interpreter::{ErrorContext, InterpreterError, MesonObject, Value};

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use hashbrown::HashMap;
 
 use crate::interpreter::builtins::filesystem::filesystem;
 use crate::interpreter::{

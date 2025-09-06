@@ -1,9 +1,10 @@
-use std::borrow::Cow;
-use std::cell::{Ref, RefCell};
-use std::collections::HashMap;
+use alloc::borrow::Cow;
+use core::cell::{Ref, RefCell};
+use hashbrown::HashMap;
 use std::env;
 use std::path::PathBuf;
-use std::rc::Rc;
+use alloc::rc::Rc;
+use core::fmt;
 
 use crate::parser::{BinaryOperator, Statement, UnaryOperator, Value as AstValue};
 
@@ -83,7 +84,7 @@ impl Value {
         match self {
             Value::Object(obj) => {
                 let src_typename = obj.borrow().object_type();
-                let dst_typename = std::any::type_name::<T>();
+                let dst_typename = core::any::type_name::<T>();
                 borrow_downcast::<T>(obj).with_context_type(|| {
                     format!("Object type mismatch, expected {dst_typename}, found {src_typename}")
                 })
@@ -142,7 +143,7 @@ impl Value {
     }
 }
 
-pub trait MesonObject: std::fmt::Debug + as_any::AsAny {
+pub trait MesonObject: fmt::Debug + as_any::AsAny {
     fn call_method(
         &mut self,
         name: &str,
@@ -161,7 +162,7 @@ pub trait MesonObject: std::fmt::Debug + as_any::AsAny {
         Value::Object(Rc::new(RefCell::new(self)))
     }
     fn object_type(&'_ self) -> &'static str {
-        std::any::type_name::<Self>()
+        core::any::type_name::<Self>()
     }
 }
 
@@ -193,15 +194,15 @@ pub enum InterpreterError {
 }
 
 macro_rules! bail_type_error {
-    ($msg:expr, $($arg:tt)*) => { return Err(InterpreterError::TypeError(std::borrow::Cow::from(format!($msg, $($arg)*)))) };
-    ($msg:expr) => { return Err(InterpreterError::TypeError(std::borrow::Cow::from(format!($msg)))) };
-    () => { return Err(InterpreterError::TypeError(std::borrow::Cow::from("Type mismatch"))) };
+    ($msg:expr, $($arg:tt)*) => { return Err(InterpreterError::TypeError(format!($msg, $($arg)*).into())) };
+    ($msg:expr) =>              { return Err(InterpreterError::TypeError(format!($msg).into())) };
+    () =>                       { return Err(InterpreterError::TypeError("Type mismatch".into())) };
 }
 
 macro_rules! bail_runtime_error {
-    ($msg:expr, $($arg:tt)*) => { return Err(InterpreterError::RuntimeError(std::borrow::Cow::from(format!($msg, $($arg)*)))) };
-    ($msg:expr) => { return Err(InterpreterError::RuntimeError(std::borrow::Cow::from(format!($msg)))) };
-    () => { return Err(InterpreterError::RuntimeError(std::borrow::Cow::from("Runtime error"))) };
+    ($msg:expr, $($arg:tt)*) => { return Err(InterpreterError::RuntimeError(format!($msg, $($arg)*).into())) };
+    ($msg:expr) =>              { return Err(InterpreterError::RuntimeError(format!($msg).into())) };
+    () =>                       { return Err(InterpreterError::RuntimeError("Runtime error".into())) };
 }
 
 pub(crate) use {bail_runtime_error, bail_type_error};
@@ -227,7 +228,7 @@ trait ErrorContext: Sized {
     ) -> Result<Self::Ok, InterpreterError>;
 }
 
-impl<T, E: std::error::Error> ErrorContext for Result<T, E> {
+impl<T, E: core::fmt::Display> ErrorContext for Result<T, E> {
     type Ok = T;
     fn with_context_type<R: Into<Cow<'static, str>>>(
         self,
@@ -261,8 +262,8 @@ impl<T> ErrorContext for Option<T> {
     }
 }
 
-impl std::fmt::Display for InterpreterError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl fmt::Display for InterpreterError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             InterpreterError::UndefinedVariable(name) => write!(f, "Undefined variable: {}", name),
             InterpreterError::UndefinedFunction(name) => write!(f, "Undefined function: {}", name),
@@ -272,7 +273,7 @@ impl std::fmt::Display for InterpreterError {
     }
 }
 
-impl std::error::Error for InterpreterError {}
+impl core::error::Error for InterpreterError {}
 
 impl Interpreter {
     pub fn new() -> Self {

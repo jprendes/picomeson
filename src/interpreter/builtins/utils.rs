@@ -1,4 +1,4 @@
-use std::slice::Iter;
+use core::slice::Iter;
 
 use crate::interpreter::Value;
 

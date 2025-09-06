@@ -19,8 +19,8 @@ macro_rules! builtin_impl {
         fn call_method(
             &mut self,
             name: &str,
-            _args: std::vec::Vec<crate::interpreter::Value>,
-            _kwargs: std::collections::HashMap<String, crate::interpreter::Value>,
+            _args: alloc::vec::Vec<crate::interpreter::Value>,
+            _kwargs: hashbrown::HashMap<String, crate::interpreter::Value>,
         ) -> Result<crate::interpreter::Value, crate::interpreter::InterpreterError> {
             match name {
                 $(stringify!($method) => self.$method(_args, _kwargs),)*
@@ -29,11 +29,11 @@ macro_rules! builtin_impl {
             }
         }
 
-        fn clone_rc(&self) -> std::rc::Rc<std::cell::RefCell<dyn crate::interpreter::MesonObject>> {
-            std::rc::Rc::new(std::cell::RefCell::new(self.clone()))
+        fn clone_rc(&self) -> alloc::rc::Rc<core::cell::RefCell<dyn crate::interpreter::MesonObject>> {
+            alloc::rc::Rc::new(core::cell::RefCell::new(self.clone()))
         }
 
-        fn is_equal(&self, other: &std::rc::Rc<std::cell::RefCell<dyn crate::interpreter::MesonObject>>) -> bool {
+        fn is_equal(&self, other: &alloc::rc::Rc<core::cell::RefCell<dyn crate::interpreter::MesonObject>>) -> bool {
             use as_any::Downcast;
             if let Some(other) = other.downcast_ref::<Self>() {
                 self == other

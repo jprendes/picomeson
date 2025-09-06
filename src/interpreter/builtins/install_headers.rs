@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use hashbrown::HashMap;
 use std::path::PathBuf;
 
 use crate::interpreter::builtins::files::files_impl;

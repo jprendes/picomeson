@@ -1,5 +1,5 @@
-use std::collections::HashMap;
-use std::fmt;
+use core::fmt;
+use hashbrown::HashMap;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -121,7 +121,7 @@ enum Token {
 }
 
 struct Lexer<'a> {
-    chars: std::iter::Peekable<std::str::CharIndices<'a>>,
+    chars: core::iter::Peekable<core::str::CharIndices<'a>>,
     current_pos: usize,
 }
 
@@ -1095,7 +1095,7 @@ impl Parser {
     }
 
     fn match_token(&mut self, token: &Token) -> bool {
-        if std::mem::discriminant(&self.peek()) == std::mem::discriminant(token) {
+        if core::mem::discriminant(&self.peek()) == core::mem::discriminant(token) {
             self.advance();
             true
         } else {
@@ -1105,7 +1105,7 @@ impl Parser {
 
     fn match_tokens(&mut self, tokens: &[Token]) -> Option<Token> {
         for token in tokens {
-            if std::mem::discriminant(&self.peek()) == std::mem::discriminant(token) {
+            if core::mem::discriminant(&self.peek()) == core::mem::discriminant(token) {
                 return Some(self.advance());
             }
         }
@@ -1113,7 +1113,7 @@ impl Parser {
     }
 
     fn expect(&mut self, token: &Token) -> Result<(), ParseError> {
-        if std::mem::discriminant(&self.peek()) == std::mem::discriminant(token) {
+        if core::mem::discriminant(&self.peek()) == core::mem::discriminant(token) {
             self.advance();
             Ok(())
         } else {
@@ -1157,7 +1157,7 @@ impl fmt::Display for ParseError {
     }
 }
 
-impl std::error::Error for ParseError {}
+impl core::error::Error for ParseError {}
 
 // Example usage
 pub fn parse_meson_file(content: &str) -> Result<Vec<Statement>, ParseError> {
