@@ -1,7 +1,8 @@
-use hashbrown::HashMap;
+use core::slice::Iter;
 use std::env;
 use std::path::PathBuf;
-use core::slice::Iter;
+
+use hashbrown::HashMap;
 
 use crate::interpreter::builtins::builtin_impl;
 use crate::interpreter::builtins::utils::flatten;

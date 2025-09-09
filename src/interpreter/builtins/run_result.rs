@@ -1,5 +1,6 @@
-use hashbrown::HashMap;
 use std::process::Command;
+
+use hashbrown::HashMap;
 
 use super::builtin_impl;
 use crate::interpreter::builtins::utils::flatten;

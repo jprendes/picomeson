@@ -1,5 +1,8 @@
-use core::fmt;
 use hashbrown::HashMap;
+
+pub mod error;
+
+pub use error::ParseError;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -1143,21 +1146,6 @@ impl Parser {
         matches!(self.peek(), Token::Eof)
     }
 }
-
-#[derive(Debug)]
-pub enum ParseError {
-    UnexpectedToken,
-}
-
-impl fmt::Display for ParseError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            ParseError::UnexpectedToken => write!(f, "Unexpected token"),
-        }
-    }
-}
-
-impl core::error::Error for ParseError {}
 
 // Example usage
 pub fn parse_meson_file(content: &str) -> Result<Vec<Statement>, ParseError> {

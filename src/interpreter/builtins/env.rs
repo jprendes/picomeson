@@ -1,9 +1,11 @@
-use hashbrown::HashMap;
 use std::env;
+
+use hashbrown::HashMap;
 
 use super::builtin_impl;
 use crate::interpreter::builtins::utils::flatten;
-use crate::interpreter::{ErrorContext, InterpreterError, MesonObject, Value};
+use crate::interpreter::error::ErrorContext as _;
+use crate::interpreter::{InterpreterError, MesonObject, Value};
 
 #[derive(Debug, Clone, PartialEq)]
 struct Env {

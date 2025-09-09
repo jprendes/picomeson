@@ -1,12 +1,13 @@
-use hashbrown::HashMap;
 use std::process::{Command, Stdio};
 
+use hashbrown::HashMap;
 use tempfile::tempdir;
 
 use super::builtin_impl;
 use crate::interpreter::builtins::utils::flatten;
+use crate::interpreter::error::ErrorContext as _;
 use crate::interpreter::{
-    ErrorContext as _, InterpreterError, MesonObject, Value, bail_runtime_error, bail_type_error,
+    InterpreterError, MesonObject, Value, bail_runtime_error, bail_type_error,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -271,8 +272,8 @@ void {symbol_name}(void) {{}}
             .arg(&out_path)
             .args(extra_args)
             .stdin(Stdio::piped())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null());
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
 
         let mut child = cmd.spawn().context_runtime("Failed to run compiler")?;
 
@@ -290,7 +291,10 @@ void {symbol_name}(void) {{}}
         let artifact = std::fs::read(&out_path).unwrap_or_default();
         let success = output.status.success();
 
-        Ok(TryCompileResult { success, artifact })
+        Ok(TryCompileResult {
+            success,
+            artifact,
+        })
     }
 }
 

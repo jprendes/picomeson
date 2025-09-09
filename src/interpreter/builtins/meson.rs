@@ -1,5 +1,6 @@
-use hashbrown::HashMap;
 use std::path::PathBuf;
+
+use hashbrown::HashMap;
 
 use super::builtin_impl;
 use crate::interpreter::builtins::compiler::get_compiler;

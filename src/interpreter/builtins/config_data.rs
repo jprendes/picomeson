@@ -1,8 +1,9 @@
 use hashbrown::HashMap;
 
 use super::builtin_impl;
+use crate::interpreter::error::ErrorContext as _;
 use crate::interpreter::{
-    ErrorContext, InterpreterError, MesonObject, Value, bail_runtime_error, bail_type_error,
+    InterpreterError, MesonObject, Value, bail_runtime_error, bail_type_error,
 };
 
 #[derive(Debug, Clone, Default, PartialEq)]

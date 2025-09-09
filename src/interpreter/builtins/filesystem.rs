@@ -1,5 +1,6 @@
-use hashbrown::HashMap;
 use std::path::{Path, PathBuf};
+
+use hashbrown::HashMap;
 
 use super::builtin_impl;
 use crate::interpreter::{InterpreterError, MesonObject, Value};

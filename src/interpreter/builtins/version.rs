@@ -1,7 +1,8 @@
 use hashbrown::HashMap;
 
 use super::builtin_impl;
-use crate::interpreter::{ErrorContext, InterpreterError, MesonObject, Value};
+use crate::interpreter::error::ErrorContext;
+use crate::interpreter::{InterpreterError, MesonObject, Value};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Version {
