@@ -11,9 +11,11 @@ use crate::parser::{BinaryOperator, Statement, UnaryOperator, Value as AstValue}
 
 mod builtins;
 
+use builtins::array as builtin_array;
 use builtins::build_target::{custom_target, executable, static_library};
 use builtins::config_data::{configuration_data, configure_file};
 use builtins::debug::{assert, error as error_fn, message, warning};
+use builtins::dict as builtin_dict;
 use builtins::env::environment;
 use builtins::external_program::find_program;
 use builtins::files::files;
@@ -27,6 +29,7 @@ use builtins::meson::{Meson, meson};
 use builtins::option::{get_option, option};
 use builtins::project::{add_project_arguments, project};
 use builtins::run_result::run_command;
+use builtins::string as builtin_string;
 use builtins::subdir::subdir;
 use builtins::variable::{get_variable, is_variable, set_variable};
 
@@ -486,153 +489,30 @@ impl Interpreter {
 
         match object {
             Value::String(ref s) => match method {
-                "format" => Ok(Value::String(
-                    Value::String(s.clone()).format_string(&eval_args),
-                )),
-                "split" => {
-                    let separator = eval_args
-                        .first()
-                        .and_then(|v| {
-                            if let Value::String(s) = v {
-                                Some(s.as_str())
-                            } else {
-                                None
-                            }
-                        })
-                        .unwrap_or(" ");
-
-                    let parts: Vec<Value> = s
-                        .split(separator)
-                        .map(|p| Value::String(p.to_string()))
-                        .collect();
-                    Ok(Value::Array(parts))
-                }
-                "join" => {
-                    let result = eval_args
-                        .iter()
-                        .map(|v| v.coerce_string())
-                        .collect::<Vec<_>>()
-                        .join(s);
-                    Ok(Value::String(result))
-                }
-                "strip" => Ok(Value::String(s.trim().to_string())),
-                "startswith" => {
-                    if let Some(Value::String(prefix)) = eval_args.first() {
-                        Ok(Value::Boolean(s.starts_with(prefix)))
-                    } else {
-                        Ok(Value::Boolean(false))
-                    }
-                }
-                "endswith" => {
-                    if let Some(Value::String(suffix)) = eval_args.first() {
-                        Ok(Value::Boolean(s.ends_with(suffix)))
-                    } else {
-                        Ok(Value::Boolean(false))
-                    }
-                }
-                "substring" => {
-                    let start = eval_args
-                        .first()
-                        .and_then(|v| {
-                            if let Value::Integer(i) = v {
-                                Some(*i as usize)
-                            } else {
-                                None
-                            }
-                        })
-                        .unwrap_or(0);
-                    let len = eval_args
-                        .get(1)
-                        .and_then(|v| {
-                            if let Value::Integer(i) = v {
-                                Some(*i as usize)
-                            } else {
-                                None
-                            }
-                        })
-                        .unwrap_or(1);
-
-                    let result = s.chars().skip(start).take(len).collect::<String>();
-                    Ok(Value::String(result))
-                }
-                "contains" => {
-                    if let Some(Value::String(substr)) = eval_args.first() {
-                        Ok(Value::Boolean(s.contains(substr)))
-                    } else {
-                        Ok(Value::Boolean(false))
-                    }
-                }
-                "underscorify" => {
-                    let underscored = s
-                        .chars()
-                        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
-                        .collect();
-                    Ok(Value::String(underscored))
-                }
-                "to_upper" => Ok(Value::String(s.to_uppercase())),
-                "to_lower" => Ok(Value::String(s.to_lowercase())),
+                "format" => builtin_string::format(s, eval_args, eval_kwargs, self),
+                "split" => builtin_string::split(s, eval_args, eval_kwargs, self),
+                "join" => builtin_string::join(s, eval_args, eval_kwargs, self),
+                "strip" => builtin_string::strip(s, eval_args, eval_kwargs, self),
+                "startswith" => builtin_string::startswith(s, eval_args, eval_kwargs, self),
+                "endswith" => builtin_string::endswith(s, eval_args, eval_kwargs, self),
+                "substring" => builtin_string::substring(s, eval_args, eval_kwargs, self),
+                "contains" => builtin_string::contains(s, eval_args, eval_kwargs, self),
+                "underscorify" => builtin_string::underscorify(s, eval_args, eval_kwargs, self),
+                "to_upper" => builtin_string::to_upper(s, eval_args, eval_kwargs, self),
+                "to_lower" => builtin_string::to_lower(s, eval_args, eval_kwargs, self),
                 _ => bail_runtime_error!("Unknown method '{method}' for string"),
             },
             Value::Array(ref arr) => match method {
-                "get" => {
-                    let idx = eval_args
-                        .first()
-                        .and_then(|v| {
-                            if let Value::Integer(i) = v {
-                                Some(*i as usize)
-                            } else {
-                                None
-                            }
-                        })
-                        .unwrap_or(0);
-
-                    if idx < arr.len() {
-                        Ok(arr[idx].clone())
-                    } else if eval_args.len() >= 2 {
-                        Ok(eval_args[1].clone())
-                    } else {
-                        Ok(Value::None)
-                    }
-                }
-                "contains" => {
-                    if let Some(item) = eval_args.first() {
-                        Ok(Value::Boolean(arr.contains(item)))
-                    } else {
-                        Ok(Value::Boolean(false))
-                    }
-                }
-                "length" => Ok(Value::Integer(arr.len() as i64)),
+                "get" => builtin_array::get(arr, eval_args, eval_kwargs, self),
+                "contains" => builtin_array::contains(arr, eval_args, eval_kwargs, self),
+                "length" => builtin_array::length(arr, eval_args, eval_kwargs, self),
                 _ => bail_runtime_error!("Unknown method '{method}' for array"),
             },
             Value::Dict(ref dict) => match method {
-                "get" => {
-                    if let Some(Value::String(key)) = eval_args.first() {
-                        if let Some(value) = dict.get(key) {
-                            Ok(value.clone())
-                        } else if eval_args.len() >= 2 {
-                            Ok(eval_args[1].clone())
-                        } else {
-                            Ok(Value::None)
-                        }
-                    } else {
-                        Ok(Value::None)
-                    }
-                }
-                "has_key" => {
-                    if let Some(Value::String(key)) = eval_args.first() {
-                        Ok(Value::Boolean(dict.contains_key(key)))
-                    } else {
-                        Ok(Value::Boolean(false))
-                    }
-                }
-                "keys" => {
-                    let keys: Vec<Value> = dict.keys().map(|k| Value::String(k.clone())).collect();
-                    Ok(Value::Array(keys))
-                }
-                "values" => {
-                    let values: Vec<Value> = dict.values().cloned().collect();
-                    Ok(Value::Array(values))
-                }
+                "get" => builtin_dict::get(dict, eval_args, eval_kwargs, self),
+                "has_key" => builtin_dict::has_key(dict, eval_args, eval_kwargs, self),
+                "keys" => builtin_dict::keys(dict, eval_args, eval_kwargs, self),
+                "values" => builtin_dict::values(dict, eval_args, eval_kwargs, self),
                 _ => bail_runtime_error!("Unknown method '{method}' for dict"),
             },
             Value::Object(ref obj) => {

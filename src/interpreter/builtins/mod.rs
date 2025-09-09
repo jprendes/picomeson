@@ -1,7 +1,9 @@
+pub mod array;
 pub mod build_target;
 pub mod compiler;
 pub mod config_data;
 pub mod debug;
+pub mod dict;
 pub mod env;
 pub mod external_program;
 pub mod files;
@@ -15,6 +17,7 @@ pub mod meson;
 pub mod option;
 pub mod project;
 pub mod run_result;
+pub mod string;
 pub mod subdir;
 pub mod utils;
 pub mod variable;
