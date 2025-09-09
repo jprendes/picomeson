@@ -16,9 +16,9 @@ impl MesonObject for IncludeDirectories {
 pub fn include_directories(
     args: Vec<Value>,
     _kwargs: HashMap<String, Value>,
-    _interp: &mut Interpreter,
+    interp: &mut Interpreter,
 ) -> Result<Value, InterpreterError> {
-    let dirs = files_impl(&args)?;
+    let dirs = files_impl(&args, interp)?;
     let inc_dirs = IncludeDirectories { dirs };
     Ok(inc_dirs.into_object())
 }

@@ -1,9 +1,10 @@
 use hashbrown::HashMap;
 
-use crate::interpreter::{Interpreter, InterpreterError, Value, error::ErrorContext};
+use crate::interpreter::error::ErrorContext;
+use crate::interpreter::{Interpreter, InterpreterError, Value};
 
 pub fn get(
-    obj: &Vec<Value>,
+    obj: &[Value],
     args: Vec<Value>,
     _kwargs: HashMap<String, Value>,
     _interp: &mut Interpreter,
@@ -32,7 +33,7 @@ pub fn get(
 }
 
 pub fn length(
-    obj: &Vec<Value>,
+    obj: &[Value],
     _args: Vec<Value>,
     _kwargs: HashMap<String, Value>,
     _interp: &mut Interpreter,
@@ -45,7 +46,7 @@ pub fn length(
 }
 
 pub fn contains(
-    obj: &Vec<Value>,
+    obj: &[Value],
     args: Vec<Value>,
     _kwargs: HashMap<String, Value>,
     _interp: &mut Interpreter,

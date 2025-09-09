@@ -1,20 +1,21 @@
 use hashbrown::HashMap;
 
-use crate::interpreter::{Interpreter, InterpreterError, Value, error::ErrorContext};
+use crate::interpreter::error::ErrorContext;
+use crate::interpreter::{Interpreter, InterpreterError, Value};
 
 pub fn format(
-    obj: &String,
+    obj: &str,
     args: Vec<Value>,
     _kwargs: HashMap<String, Value>,
     _interp: &mut Interpreter,
 ) -> Result<Value, InterpreterError> {
     Ok(Value::String(
-        Value::String(obj.clone()).format_string(&args),
+        Value::String(obj.into()).format_string(&args),
     ))
 }
 
 pub fn split(
-    obj: &String,
+    obj: &str,
     args: Vec<Value>,
     _kwargs: HashMap<String, Value>,
     _interp: &mut Interpreter,
@@ -35,7 +36,7 @@ pub fn split(
 }
 
 pub fn join(
-    obj: &String,
+    obj: &str,
     args: Vec<Value>,
     _kwargs: HashMap<String, Value>,
     _interp: &mut Interpreter,
@@ -49,7 +50,7 @@ pub fn join(
 }
 
 pub fn strip(
-    obj: &String,
+    obj: &str,
     _args: Vec<Value>,
     _kwargs: HashMap<String, Value>,
     _interp: &mut Interpreter,
@@ -58,7 +59,7 @@ pub fn strip(
 }
 
 pub fn startswith(
-    obj: &String,
+    obj: &str,
     args: Vec<Value>,
     _kwargs: HashMap<String, Value>,
     _interp: &mut Interpreter,
@@ -73,7 +74,7 @@ pub fn startswith(
 }
 
 pub fn endswith(
-    obj: &String,
+    obj: &str,
     args: Vec<Value>,
     _kwargs: HashMap<String, Value>,
     _interp: &mut Interpreter,
@@ -88,7 +89,7 @@ pub fn endswith(
 }
 
 pub fn substring(
-    obj: &String,
+    obj: &str,
     args: Vec<Value>,
     _kwargs: HashMap<String, Value>,
     _interp: &mut Interpreter,
@@ -128,7 +129,7 @@ pub fn substring(
 }
 
 pub fn contains(
-    obj: &String,
+    obj: &str,
     args: Vec<Value>,
     _kwargs: HashMap<String, Value>,
     _interp: &mut Interpreter,
@@ -143,7 +144,7 @@ pub fn contains(
 }
 
 pub fn underscorify(
-    obj: &String,
+    obj: &str,
     _args: Vec<Value>,
     _kwargs: HashMap<String, Value>,
     _interp: &mut Interpreter,
@@ -156,7 +157,7 @@ pub fn underscorify(
 }
 
 pub fn to_upper(
-    obj: &String,
+    obj: &str,
     _args: Vec<Value>,
     _kwargs: HashMap<String, Value>,
     _interp: &mut Interpreter,
@@ -165,7 +166,7 @@ pub fn to_upper(
 }
 
 pub fn to_lower(
-    obj: &String,
+    obj: &str,
     _args: Vec<Value>,
     _kwargs: HashMap<String, Value>,
     _interp: &mut Interpreter,

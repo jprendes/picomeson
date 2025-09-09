@@ -15,6 +15,9 @@ pub struct Compiler {
     command: Vec<String>,
 }
 
+const DELIMITER: &str = r#""MESON_DELIMITER" "#;
+const SYMBOL_NAME: &str = "meson_uscore_prefix";
+
 impl MesonObject for Compiler {
     builtin_impl!(
         get_id,
@@ -36,10 +39,18 @@ impl Compiler {
         &self,
         _args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
-        _interp: &mut Interpreter,
+        interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
-        // TODO: actually detect compiler
-        Ok(Value::String("cc".to_string()))
+        let code = include_str!("compiler/compiler_id.c");
+        let result = self.try_compile(&["-c", "-E"], &[], code, interp)?;
+        let output = String::from_utf8_lossy(&result.artifact);
+        let suffix = output.rsplit_once(DELIMITER).map(|(_, s)| s.trim());
+        match suffix {
+            None | Some("") => Err(InterpreterError::RuntimeError(
+                "Failed to detect compiler family".into(),
+            )),
+            Some(family) => Ok(Value::String(family.into())),
+        }
     }
 
     fn get_linker_id(
@@ -177,20 +188,10 @@ impl Compiler {
         _kwargs: HashMap<String, Value>,
         interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
-        let delimiter = r#""MESON_HAVE_UNDERSCORE_DELIMITER" "#;
-        let code = format!(
-            "
-#ifndef __USER_LABEL_PREFIX__
-#define MESON_UNDERSCORE_PREFIX unsupported
-#else
-#define MESON_UNDERSCORE_PREFIX __USER_LABEL_PREFIX__
-#endif
-{delimiter}MESON_UNDERSCORE_PREFIX
-"
-        );
-        let result = self.try_compile(&["-c", "-E"], &[], &code, interp)?;
+        let code = include_str!("compiler/underscore_prefix.c");
+        let result = self.try_compile(&["-c", "-E"], &[], code, interp)?;
         let output = String::from_utf8_lossy(&result.artifact);
-        let suffix = output.rsplit_once(delimiter).map(|(_, s)| s.trim());
+        let suffix = output.rsplit_once(DELIMITER).map(|(_, s)| s.trim());
         match suffix {
             Some("_") => Ok(Value::Boolean(true)),
             Some("") => Ok(Value::Boolean(false)),
@@ -202,23 +203,12 @@ impl Compiler {
         &self,
         interp: &Interpreter,
     ) -> Result<Value, InterpreterError> {
-        let symbol_name = "meson_uscore_prefix";
-        let code = format!(
-            "
-#ifdef __cplusplus
-extern \"C\" {{
-#endif
-void {symbol_name}(void) {{}}
-#ifdef __cplusplus
-}}
-#endif
-"
-        );
-        let artifact = self.try_compile(&["-c"], &[], &code, interp)?.artifact;
+        let code = include_str!("compiler/underscore_prefix2.c");
+        let artifact = self.try_compile(&["-c"], &[], code, interp)?.artifact;
         let artifact = String::from_utf8_lossy(&artifact);
-        if artifact.contains(&format!("_{symbol_name}")) {
+        if artifact.contains(&format!("_{SYMBOL_NAME}")) {
             Ok(Value::Boolean(true))
-        } else if artifact.contains(symbol_name) {
+        } else if artifact.contains(SYMBOL_NAME) {
             Ok(Value::Boolean(false))
         } else {
             Err(InterpreterError::RuntimeError(
@@ -347,7 +337,7 @@ fn get_extra_args(kwargs: &HashMap<String, Value>) -> Result<Vec<&str>, Interpre
 pub fn get_compiler(
     args: Vec<Value>,
     _kwargs: HashMap<String, Value>,
-    _interp: &mut Interpreter,
+    interp: &mut Interpreter,
 ) -> Result<Value, InterpreterError> {
     let Some(Value::String(lang)) = args.first() else {
         return Err(InterpreterError::TypeError(
@@ -355,17 +345,10 @@ pub fn get_compiler(
         ));
     };
 
-    match lang.as_str() {
-        "c" => {
-            let command = std::env::var("CC").unwrap_or_else(|_| "cc".to_string());
-            let command = vec![command];
-            Ok(Compiler { command }.into_object())
-        }
-        "cpp" => {
-            let command = std::env::var("CXX").unwrap_or_else(|_| "c++".to_string());
-            let command = vec![command];
-            Ok(Compiler { command }.into_object())
-        }
-        lang => bail_runtime_error!("Unsupported language '{lang}'"),
-    }
+    let command = interp
+        .os_env
+        .get_compiler(lang.as_str())
+        .with_context_runtime(|| format!("Failed to get {lang} compiler"))?;
+
+    Ok(Compiler { command }.into_object())
 }

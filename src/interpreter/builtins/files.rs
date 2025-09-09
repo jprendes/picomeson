@@ -1,6 +1,3 @@
-use std::env;
-use std::path::PathBuf;
-
 use hashbrown::HashMap;
 
 use crate::interpreter::builtins::builtin_impl;
@@ -9,8 +6,8 @@ use crate::interpreter::{Interpreter, InterpreterError, MesonObject, Value, bail
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct File {
-    pwd: PathBuf,
-    path: PathBuf,
+    pwd: String,
+    path: String,
 }
 
 impl MesonObject for File {
@@ -19,14 +16,15 @@ impl MesonObject for File {
 
 pub(super) fn files_impl<'a, 'b: 'a>(
     args: &'b (impl AsValueSlice<'a> + ?Sized),
+    interp: &Interpreter,
 ) -> Result<Vec<File>, InterpreterError> {
-    let pwd = env::current_dir().unwrap();
+    let pwd = &interp.current_dir;
     flatten(args)
         .map(|arg| {
             if let Ok(s) = arg.as_string() {
                 Ok(File {
                     pwd: pwd.clone(),
-                    path: PathBuf::from(s),
+                    path: String::from(s),
                 })
             } else if let Ok(file) = arg.as_object::<File>() {
                 Ok(file.clone())
@@ -40,9 +38,9 @@ pub(super) fn files_impl<'a, 'b: 'a>(
 pub fn files(
     args: Vec<Value>,
     _kwargs: HashMap<String, Value>,
-    _interp: &mut Interpreter,
+    interp: &mut Interpreter,
 ) -> Result<Value, InterpreterError> {
-    let files = files_impl(&args)?
+    let files = files_impl(&args, interp)?
         .into_iter()
         .map(MesonObject::into_object)
         .collect();

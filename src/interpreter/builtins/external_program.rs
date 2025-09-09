@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 use std::process::Command;
 
 use hashbrown::HashMap;
@@ -10,7 +9,7 @@ use crate::interpreter::{
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExternalProgram {
-    full_path: Option<PathBuf>,
+    full_path: Option<String>,
 }
 
 impl ExternalProgram {
@@ -32,7 +31,7 @@ impl ExternalProgram {
         let Some(path) = &self.full_path else {
             return Ok(Value::None);
         };
-        Ok(Value::String(path.to_string_lossy().into()))
+        Ok(Value::String(path.clone()))
     }
 }
 
@@ -67,10 +66,7 @@ pub fn find_program(
 
     let found = full_path.is_some();
 
-    let program = ExternalProgram {
-        full_path: full_path.map(PathBuf::from),
-    }
-    .into_object();
+    let program = ExternalProgram { full_path }.into_object();
 
     if found {
         return Ok(program);

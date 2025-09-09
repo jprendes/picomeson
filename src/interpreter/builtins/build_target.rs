@@ -46,7 +46,7 @@ impl MesonObject for BuildTarget {
 pub fn static_library(
     args: Vec<Value>,
     _kwargs: HashMap<String, Value>,
-    _interp: &mut Interpreter,
+    interp: &mut Interpreter,
 ) -> Result<Value, InterpreterError> {
     let Some(Value::String(name)) = args.first() else {
         return Err(InterpreterError::TypeError(
@@ -54,7 +54,7 @@ pub fn static_library(
         ));
     };
 
-    let sources = files_impl(&args[1..])?;
+    let sources = files_impl(&args[1..], interp)?;
 
     let lib = BuildTarget {
         name: name.clone(),
@@ -70,7 +70,7 @@ pub fn static_library(
 pub fn executable(
     args: Vec<Value>,
     _kwargs: HashMap<String, Value>,
-    _interp: &mut Interpreter,
+    interp: &mut Interpreter,
 ) -> Result<Value, InterpreterError> {
     let Some(Value::String(name)) = args.first() else {
         return Err(InterpreterError::TypeError(
@@ -78,7 +78,7 @@ pub fn executable(
         ));
     };
 
-    let sources = files_impl(&args[1..])?;
+    let sources = files_impl(&args[1..], interp)?;
 
     let bin = BuildTarget {
         name: name.clone(),

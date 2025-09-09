@@ -1,21 +1,18 @@
 use alloc::rc::Rc;
 use core::cell::{Ref, RefCell};
 use core::fmt;
-use std::env;
-use std::path::PathBuf;
 
 use as_any::Downcast;
 use hashbrown::HashMap;
 
+use crate::os::Os;
 use crate::parser::{BinaryOperator, Statement, UnaryOperator, Value as AstValue};
 
 mod builtins;
 
-use builtins::array as builtin_array;
 use builtins::build_target::{custom_target, executable, static_library};
 use builtins::config_data::{configuration_data, configure_file};
 use builtins::debug::{assert, error as error_fn, message, warning};
-use builtins::dict as builtin_dict;
 use builtins::env::environment;
 use builtins::external_program::find_program;
 use builtins::files::files;
@@ -29,9 +26,9 @@ use builtins::meson::{Meson, meson};
 use builtins::option::{get_option, option};
 use builtins::project::{add_project_arguments, project};
 use builtins::run_result::run_command;
-use builtins::string as builtin_string;
 use builtins::subdir::subdir;
 use builtins::variable::{get_variable, is_variable, set_variable};
+use builtins::{array as builtin_array, dict as builtin_dict, string as builtin_string};
 
 pub mod error;
 
@@ -215,13 +212,13 @@ pub struct Interpreter {
     break_flag: bool,
     continue_flag: bool,
     meson: Rc<RefCell<Meson>>,
+    current_dir: String,
+    os_env: Box<dyn Os>,
 }
 
 impl Interpreter {
-    pub fn new() -> Self {
-        let src_dir = env::current_dir().unwrap();
-        let bld_dir = src_dir.join("build");
-        let meson = meson(src_dir, bld_dir);
+    pub fn new(os_env: impl Os) -> Self {
+        let meson = meson(".", "./build");
         let meson = Rc::new(RefCell::new(meson));
 
         let mut interpreter = Self {
@@ -230,6 +227,8 @@ impl Interpreter {
             break_flag: false,
             continue_flag: false,
             meson,
+            current_dir: ".".into(),
+            os_env: Box::new(os_env),
         };
 
         // Initialize built-in variables
@@ -244,15 +243,19 @@ impl Interpreter {
 
         // Host machine
         self.variables
-            .insert("host_machine".to_string(), host_machine().into_object());
+            .insert("host_machine".to_string(), host_machine(self).into_object());
 
         // Target machine
-        self.variables
-            .insert("target_machine".to_string(), target_machine().into_object());
+        self.variables.insert(
+            "target_machine".to_string(),
+            target_machine(self).into_object(),
+        );
 
         // Build machine (same as host for now)
-        self.variables
-            .insert("build_machine".to_string(), host_machine().into_object());
+        self.variables.insert(
+            "build_machine".to_string(),
+            host_machine(self).into_object(),
+        );
 
         // File system object
         self.variables
@@ -551,10 +554,10 @@ impl Interpreter {
                             Ok(Value::Integer(a / b))
                         }
                     }
-                    (Value::String(s), Value::String(sep)) => {
+                    (Value::String(a), Value::String(b)) => {
                         // Path joining in Meson
-                        let path = PathBuf::from(s).join(sep);
-                        Ok(Value::String(path.to_string_lossy().to_string()))
+                        let joined = self.os_env.join_paths(&[a, b]);
+                        Ok(Value::String(joined))
                     }
                     _ => bail_type_error!("Invalid operands for division"),
                 }
@@ -706,7 +709,10 @@ impl Interpreter {
 }
 
 // Helper function to run interpreter on parsed AST
-pub fn run_interpreter(statements: Vec<Statement>) -> Result<(), InterpreterError> {
-    let mut interpreter = Interpreter::new();
+pub fn run_interpreter(
+    os_env: impl Os,
+    statements: Vec<Statement>,
+) -> Result<(), InterpreterError> {
+    let mut interpreter = Interpreter::new(os_env);
     interpreter.interpret(statements)
 }

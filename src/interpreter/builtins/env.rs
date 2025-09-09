@@ -1,10 +1,8 @@
-use std::env;
-
 use hashbrown::HashMap;
 
 use super::builtin_impl;
 use crate::interpreter::builtins::utils::flatten;
-use crate::interpreter::error::ErrorContext as _;
+use crate::interpreter::error::ErrorContext;
 use crate::interpreter::{Interpreter, InterpreterError, MesonObject, Value};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -23,40 +21,28 @@ impl Env {
         kwargs: HashMap<String, Value>,
         _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
-        let mut args = flatten(&args).map(|v| v.as_string());
+        let variable = args
+            .first()
+            .context_type("Expected the first argument to be a string representing the environment variable name")?
+            .as_string()
+            .context_type("Expected the first argument to be a string representing the environment variable name")?;
 
-        let separator = match kwargs.get("separator") {
-            Some(Value::String(s)) => Some(s.as_str()),
-            None => None,
-            Some(_) => {
-                return Err(InterpreterError::TypeError(
-                    "Expected 'separator' keyword argument to be a string".into(),
-                ));
-            }
-        };
+        let new_values = flatten(&args[1..]).map(|v| v.as_string());
 
-        let Some(variable) = args.next().transpose()? else {
-            return Err(InterpreterError::TypeError(
-                "Expected at least one arguments".into(),
-            ));
-        };
+        #[cfg(windows)]
+        const DEFAULT_SEP: &str = ";";
+        #[cfg(not(windows))]
+        const DEFAULT_SEP: &str = ":";
 
-        let values = self
-            .vars
-            .get(variable)
-            .map(|s| Ok(s.as_str()))
-            .into_iter()
-            .chain(args)
-            .collect::<Result<Vec<_>, _>>()?;
+        let separator = kwargs
+            .get("separator")
+            .map(Value::as_string)
+            .unwrap_or(Ok(DEFAULT_SEP))
+            .context_type("Expected 'separator' keyword argument to be a string")?;
 
-        let value = if let Some(sep) = separator {
-            values.join(sep)
-        } else {
-            env::join_paths(values)
-                .context_runtime("msg Failed to join values")?
-                .to_string_lossy()
-                .into_owned()
-        };
+        let old_value = self.vars.get(variable).map(|s| Ok(s.as_str()));
+        let values = new_values.chain(old_value).collect::<Result<Vec<_>, _>>()?;
+        let value = values.join(separator);
 
         self.vars.insert(variable.to_string(), value);
 

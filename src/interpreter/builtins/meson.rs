@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use hashbrown::HashMap;
 
 use super::builtin_impl;
@@ -9,8 +7,8 @@ use crate::interpreter::{Interpreter, InterpreterError, MesonObject, Value};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Meson {
-    build_dir: PathBuf,
-    source_dir: PathBuf,
+    build_dir: String,
+    source_dir: String,
     pub project_name: String,
     pub project_version: String,
     pub project_args: HashMap<String, Vec<String>>,
@@ -82,7 +80,7 @@ impl Meson {
         _kwargs: HashMap<String, Value>,
         _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
-        Ok(Value::String(self.build_dir.to_string_lossy().into_owned()))
+        Ok(Value::String(self.build_dir.clone()))
     }
 
     fn current_source_dir(
@@ -91,13 +89,11 @@ impl Meson {
         _kwargs: HashMap<String, Value>,
         _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
-        Ok(Value::String(
-            self.source_dir.to_string_lossy().into_owned(),
-        ))
+        Ok(Value::String(self.source_dir.clone()))
     }
 }
 
-pub fn meson(build_dir: impl Into<PathBuf>, source_dir: impl Into<PathBuf>) -> Meson {
+pub fn meson(build_dir: impl Into<String>, source_dir: impl Into<String>) -> Meson {
     Meson {
         build_dir: build_dir.into(),
         source_dir: source_dir.into(),

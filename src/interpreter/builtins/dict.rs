@@ -1,6 +1,7 @@
 use hashbrown::HashMap;
 
-use crate::interpreter::{Interpreter, InterpreterError, Value, error::ErrorContext};
+use crate::interpreter::error::ErrorContext;
+use crate::interpreter::{Interpreter, InterpreterError, Value};
 
 pub fn get(
     obj: &HashMap<String, Value>,

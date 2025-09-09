@@ -1,9 +1,8 @@
-use std::env;
-
 use hashbrown::HashMap;
 
 use super::builtin_impl;
 use crate::interpreter::{Interpreter, InterpreterError, MesonObject, Value};
+use crate::os::MachineInfo;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Machine {
@@ -18,20 +17,6 @@ impl MesonObject for Machine {
 }
 
 impl Machine {
-    pub fn new(
-        system: impl Into<String>,
-        cpu_family: impl Into<String>,
-        cpu: impl Into<String>,
-        endian: impl Into<String>,
-    ) -> Self {
-        Self {
-            system: system.into(),
-            cpu_family: cpu_family.into(),
-            cpu: cpu.into(),
-            endian: endian.into(),
-        }
-    }
-
     fn system(
         &self,
         _args: Vec<Value>,
@@ -69,26 +54,32 @@ impl Machine {
     }
 }
 
-pub fn host_machine() -> Machine {
-    let system = env::consts::OS.to_string();
-    let cpu_family = env::consts::ARCH.to_string();
-    let cpu = env::consts::ARCH.to_string();
-    let endian = if cfg!(target_endian = "big") {
-        "big".to_string()
-    } else {
-        "little".to_string()
-    };
-    Machine::new(system, cpu_family, cpu, endian)
+pub fn host_machine(interp: &Interpreter) -> Machine {
+    let MachineInfo {
+        system,
+        cpu,
+        endian,
+    } = interp.os_env.host();
+
+    Machine {
+        system,
+        cpu_family: cpu.clone(),
+        cpu,
+        endian,
+    }
 }
 
-pub fn target_machine() -> Machine {
-    let system = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
-    let cpu_family = env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
-    let cpu = env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
-    let endian = if env::var("CARGO_CFG_TARGET_ENDIAN").unwrap_or_default() == "big" {
-        "big".to_string()
-    } else {
-        "little".to_string()
-    };
-    Machine::new(system, cpu_family, cpu, endian)
+pub fn target_machine(interp: &Interpreter) -> Machine {
+    let MachineInfo {
+        system,
+        cpu,
+        endian,
+    } = interp.os_env.target();
+
+    Machine {
+        system,
+        cpu_family: cpu.clone(),
+        cpu,
+        endian,
+    }
 }

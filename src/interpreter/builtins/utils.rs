@@ -27,7 +27,7 @@ impl<'a> AsValueSlice<'a> for [Value] {
 impl<'a> AsValueSlice<'a> for Option<&Value> {
     fn as_slice(&'a self) -> &'a [Value] {
         match *self {
-            Some(v) => std::slice::from_ref(v),
+            Some(v) => core::slice::from_ref(v),
             None => &[],
         }
     }
