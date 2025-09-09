@@ -5,7 +5,7 @@ use hashbrown::HashMap;
 use super::builtin_impl;
 use crate::interpreter::builtins::utils::flatten;
 use crate::interpreter::error::ErrorContext as _;
-use crate::interpreter::{InterpreterError, MesonObject, Value};
+use crate::interpreter::{Interpreter, InterpreterError, MesonObject, Value};
 
 #[derive(Debug, Clone, PartialEq)]
 struct Env {
@@ -21,6 +21,7 @@ impl Env {
         &mut self,
         args: Vec<Value>,
         kwargs: HashMap<String, Value>,
+        _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         let mut args = flatten(&args).map(|v| v.as_string());
 
@@ -66,6 +67,7 @@ impl Env {
 pub fn environment(
     args: Vec<Value>,
     _kwargs: HashMap<String, Value>,
+    _interp: &mut Interpreter,
 ) -> Result<Value, InterpreterError> {
     let vars = match args.first() {
         Some(Value::Dict(data)) => data

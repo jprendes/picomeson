@@ -2,12 +2,13 @@ use hashbrown::HashMap;
 
 use crate::interpreter::builtins::filesystem::filesystem;
 use crate::interpreter::{
-    InterpreterError, MesonObject as _, Value, bail_runtime_error, bail_type_error,
+    Interpreter, InterpreterError, MesonObject as _, Value, bail_runtime_error, bail_type_error,
 };
 
 pub fn import(
     args: Vec<Value>,
     _kwargs: HashMap<String, Value>,
+    _interp: &mut Interpreter,
 ) -> Result<Value, InterpreterError> {
     let Some(Value::String(module_name)) = args.first() else {
         bail_type_error!("import requires a string argument");

@@ -4,7 +4,7 @@ use hashbrown::HashMap;
 
 use super::builtin_impl;
 use crate::interpreter::builtins::utils::flatten;
-use crate::interpreter::{InterpreterError, MesonObject, Value};
+use crate::interpreter::{Interpreter, InterpreterError, MesonObject, Value};
 
 #[derive(Debug, Clone, PartialEq)]
 struct RunResult {
@@ -22,6 +22,7 @@ impl RunResult {
         &self,
         _args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
+        _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         Ok(Value::String(self.stdout.clone()))
     }
@@ -30,6 +31,7 @@ impl RunResult {
         &self,
         _args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
+        _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         Ok(Value::String(self.stderr.clone()))
     }
@@ -38,6 +40,7 @@ impl RunResult {
         &self,
         _args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
+        _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         Ok(Value::Integer(self.returncode))
     }
@@ -46,6 +49,7 @@ impl RunResult {
 pub fn run_command(
     args: Vec<Value>,
     _kwargs: HashMap<String, Value>,
+    _interp: &mut Interpreter,
 ) -> Result<Value, InterpreterError> {
     let cmd_args = flatten(&args)
         .map(Value::as_string)

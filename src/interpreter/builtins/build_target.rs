@@ -2,7 +2,7 @@ use hashbrown::HashMap;
 
 use crate::interpreter::builtins::builtin_impl;
 use crate::interpreter::builtins::files::{File, files_impl};
-use crate::interpreter::{InterpreterError, MesonObject, Value};
+use crate::interpreter::{Interpreter, InterpreterError, MesonObject, Value};
 
 #[derive(Debug, Clone, PartialEq)]
 enum TargetType {
@@ -22,6 +22,7 @@ impl BuildTarget {
         &self,
         _args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
+        _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         // Placeholder implementation
         Ok(Value::None)
@@ -31,6 +32,7 @@ impl BuildTarget {
         &self,
         _args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
+        _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         // Placeholder implementation
         Ok(Value::None)
@@ -44,6 +46,7 @@ impl MesonObject for BuildTarget {
 pub fn static_library(
     args: Vec<Value>,
     _kwargs: HashMap<String, Value>,
+    _interp: &mut Interpreter,
 ) -> Result<Value, InterpreterError> {
     let Some(Value::String(name)) = args.first() else {
         return Err(InterpreterError::TypeError(
@@ -67,6 +70,7 @@ pub fn static_library(
 pub fn executable(
     args: Vec<Value>,
     _kwargs: HashMap<String, Value>,
+    _interp: &mut Interpreter,
 ) -> Result<Value, InterpreterError> {
     let Some(Value::String(name)) = args.first() else {
         return Err(InterpreterError::TypeError(
@@ -83,4 +87,14 @@ pub fn executable(
     };
 
     Ok(bin.into_object())
+}
+
+pub fn custom_target(
+    _args: Vec<Value>,
+    _kwargs: HashMap<String, Value>,
+    _interp: &mut Interpreter,
+) -> Result<Value, InterpreterError> {
+    // Placeholder implementation
+    // TODO: Implement custom_target
+    Ok(Value::None)
 }

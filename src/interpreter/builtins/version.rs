@@ -2,7 +2,7 @@ use hashbrown::HashMap;
 
 use super::builtin_impl;
 use crate::interpreter::error::ErrorContext;
-use crate::interpreter::{InterpreterError, MesonObject, Value};
+use crate::interpreter::{Interpreter, InterpreterError, MesonObject, Value};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Version {
@@ -14,6 +14,7 @@ impl Version {
         &self,
         args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
+        _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         let Some(Value::String(req)) = args.first() else {
             return Err(InterpreterError::TypeError(

@@ -1,12 +1,12 @@
 use core::fmt;
-use std::borrow::Cow;
+use std::fmt::Display;
 
 #[derive(Debug)]
 pub enum InterpreterError {
-    UndefinedVariable(Cow<'static, str>),
-    UndefinedFunction(Cow<'static, str>),
-    TypeError(Cow<'static, str>),
-    RuntimeError(Cow<'static, str>),
+    UndefinedVariable(String),
+    UndefinedFunction(String),
+    TypeError(String),
+    RuntimeError(String),
 }
 
 macro_rules! bail_type_error {
@@ -25,20 +25,24 @@ pub(crate) use {bail_runtime_error, bail_type_error};
 
 pub trait ErrorContext: Sized {
     type Ok;
-    fn context_type(self, msg: impl Into<Cow<'static, str>>) -> Result<Self::Ok, InterpreterError> {
+    fn context_type(self, msg: impl Display) -> Result<Self::Ok, InterpreterError> {
         self.with_context_type(|| msg)
     }
-    fn context_runtime(
-        self,
-        msg: impl Into<Cow<'static, str>>,
-    ) -> Result<Self::Ok, InterpreterError> {
+    fn context_undef_variable(self, msg: impl Display) -> Result<Self::Ok, InterpreterError> {
+        self.with_context_undef_variable(|| msg)
+    }
+    fn context_runtime(self, msg: impl Display) -> Result<Self::Ok, InterpreterError> {
         self.with_context_runtime(|| msg)
     }
-    fn with_context_type<R: Into<Cow<'static, str>>>(
+    fn with_context_type<R: Display>(
         self,
         f: impl FnOnce() -> R,
     ) -> Result<Self::Ok, InterpreterError>;
-    fn with_context_runtime<R: Into<Cow<'static, str>>>(
+    fn with_context_runtime<R: Display>(
+        self,
+        f: impl FnOnce() -> R,
+    ) -> Result<Self::Ok, InterpreterError>;
+    fn with_context_undef_variable<R: Display>(
         self,
         f: impl FnOnce() -> R,
     ) -> Result<Self::Ok, InterpreterError>;
@@ -46,35 +50,39 @@ pub trait ErrorContext: Sized {
 
 impl<T, E: core::fmt::Display> ErrorContext for Result<T, E> {
     type Ok = T;
-    fn with_context_type<R: Into<Cow<'static, str>>>(
-        self,
-        f: impl FnOnce() -> R,
-    ) -> Result<T, InterpreterError> {
-        self.map_err(|e| InterpreterError::TypeError(Cow::from(format!("{}: {}", f().into(), e))))
+    fn with_context_type<R: Display>(self, f: impl FnOnce() -> R) -> Result<T, InterpreterError> {
+        self.map_err(|e| InterpreterError::TypeError(format!("{}: {}", f(), e)))
     }
-    fn with_context_runtime<R: Into<Cow<'static, str>>>(
+    fn with_context_runtime<R: Display>(
         self,
         f: impl FnOnce() -> R,
     ) -> Result<T, InterpreterError> {
-        self.map_err(|e| {
-            InterpreterError::RuntimeError(Cow::from(format!("{}: {}", f().into(), e)))
-        })
+        self.map_err(|e| InterpreterError::RuntimeError(format!("{}: {}", f(), e)))
+    }
+    fn with_context_undef_variable<R: Display>(
+        self,
+        f: impl FnOnce() -> R,
+    ) -> Result<T, InterpreterError> {
+        self.map_err(|e| InterpreterError::UndefinedVariable(format!("{}: {}", f(), e)))
     }
 }
 
 impl<T> ErrorContext for Option<T> {
     type Ok = T;
-    fn with_context_type<R: Into<Cow<'static, str>>>(
-        self,
-        f: impl FnOnce() -> R,
-    ) -> Result<T, InterpreterError> {
-        self.ok_or_else(|| InterpreterError::TypeError(Cow::from(format!("{}", f().into()))))
+    fn with_context_type<R: Display>(self, f: impl FnOnce() -> R) -> Result<T, InterpreterError> {
+        self.ok_or_else(|| InterpreterError::TypeError(f().to_string()))
     }
-    fn with_context_runtime<R: Into<Cow<'static, str>>>(
+    fn with_context_runtime<R: Display>(
         self,
         f: impl FnOnce() -> R,
     ) -> Result<T, InterpreterError> {
-        self.ok_or_else(|| InterpreterError::RuntimeError(Cow::from(format!("{}", f().into()))))
+        self.ok_or_else(|| InterpreterError::RuntimeError(f().to_string()))
+    }
+    fn with_context_undef_variable<R: Display>(
+        self,
+        f: impl FnOnce() -> R,
+    ) -> Result<T, InterpreterError> {
+        self.ok_or_else(|| InterpreterError::UndefinedVariable(f().to_string()))
     }
 }
 

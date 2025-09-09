@@ -5,7 +5,7 @@ use hashbrown::HashMap;
 
 use super::builtin_impl;
 use crate::interpreter::{
-    InterpreterError, MesonObject, Value, bail_runtime_error, bail_type_error,
+    Interpreter, InterpreterError, MesonObject, Value, bail_runtime_error, bail_type_error,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -18,6 +18,7 @@ impl ExternalProgram {
         &self,
         _args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
+        _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         Ok(Value::Boolean(self.full_path.is_some()))
     }
@@ -26,6 +27,7 @@ impl ExternalProgram {
         &self,
         _args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
+        _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         let Some(path) = &self.full_path else {
             return Ok(Value::None);
@@ -41,6 +43,7 @@ impl MesonObject for ExternalProgram {
 pub fn find_program(
     args: Vec<Value>,
     kwargs: HashMap<String, Value>,
+    _interp: &mut Interpreter,
 ) -> Result<Value, InterpreterError> {
     let Some(Value::String(prog)) = args.first() else {
         return Err(InterpreterError::TypeError(

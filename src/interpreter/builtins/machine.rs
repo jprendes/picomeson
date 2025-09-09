@@ -3,7 +3,7 @@ use std::env;
 use hashbrown::HashMap;
 
 use super::builtin_impl;
-use crate::interpreter::{InterpreterError, MesonObject, Value};
+use crate::interpreter::{Interpreter, InterpreterError, MesonObject, Value};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Machine {
@@ -36,6 +36,7 @@ impl Machine {
         &self,
         _args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
+        _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         Ok(Value::String(self.system.clone()))
     }
@@ -44,6 +45,7 @@ impl Machine {
         &self,
         _args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
+        _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         Ok(Value::String(self.cpu_family.clone()))
     }
@@ -52,6 +54,7 @@ impl Machine {
         &self,
         _args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
+        _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         Ok(Value::String(self.cpu.clone()))
     }
@@ -60,6 +63,7 @@ impl Machine {
         &self,
         _args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
+        _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         Ok(Value::String(self.endian.clone()))
     }

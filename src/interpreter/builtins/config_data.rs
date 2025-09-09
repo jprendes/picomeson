@@ -3,7 +3,7 @@ use hashbrown::HashMap;
 use super::builtin_impl;
 use crate::interpreter::error::ErrorContext as _;
 use crate::interpreter::{
-    InterpreterError, MesonObject, Value, bail_runtime_error, bail_type_error,
+    Interpreter, InterpreterError, MesonObject, Value, bail_runtime_error, bail_type_error,
 };
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -16,6 +16,7 @@ impl ConfigData {
         &self,
         args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
+        _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         let Some(Value::String(key)) = args.first() else {
             return Err(InterpreterError::TypeError(
@@ -33,6 +34,7 @@ impl ConfigData {
         &mut self,
         args: Vec<Value>,
         kwargs: HashMap<String, Value>,
+        _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         let Some(Value::String(key)) = args.first() else {
             return Err(InterpreterError::TypeError(
@@ -68,6 +70,7 @@ impl ConfigData {
         &mut self,
         mut args: Vec<Value>,
         kwargs: HashMap<String, Value>,
+        interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         match args.get_mut(1) {
             Some(v @ Value::Boolean(true)) => {
@@ -86,13 +89,14 @@ impl ConfigData {
                 bail_type_error!("Expected int or bool as the second argument");
             }
         }
-        self.set(args, kwargs)
+        self.set(args, kwargs, interp)
     }
 
     fn merge_from(
         &mut self,
         args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
+        _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         let other = args.first().context_type(
             "merge_from requires a ConfigData object or a dict as the first argument",
@@ -118,6 +122,7 @@ impl MesonObject for ConfigData {
 pub fn configure_file(
     _args: Vec<Value>,
     kwargs: HashMap<String, Value>,
+    _interp: &mut Interpreter,
 ) -> Result<Value, InterpreterError> {
     let input = match kwargs.get("input") {
         Some(Value::String(s)) => Some(s.clone()),
@@ -169,6 +174,7 @@ pub fn configure_file(
 pub fn configuration_data(
     _args: Vec<Value>,
     _kwargs: HashMap<String, Value>,
+    _interp: &mut Interpreter,
 ) -> Result<Value, InterpreterError> {
     Ok(ConfigData::default().into_object())
 }

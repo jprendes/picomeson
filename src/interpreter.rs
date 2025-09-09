@@ -4,16 +4,16 @@ use core::fmt;
 use std::env;
 use std::path::PathBuf;
 
+use as_any::Downcast;
 use hashbrown::HashMap;
 
-use crate::interpreter::error::ErrorContext as _;
 use crate::parser::{BinaryOperator, Statement, UnaryOperator, Value as AstValue};
 
 mod builtins;
 
-use as_any::Downcast;
-use builtins::build_target::{executable, static_library};
+use builtins::build_target::{custom_target, executable, static_library};
 use builtins::config_data::{configuration_data, configure_file};
+use builtins::debug::{assert, error as error_fn, message, warning};
 use builtins::env::environment;
 use builtins::external_program::find_program;
 use builtins::files::files;
@@ -21,14 +21,19 @@ use builtins::filesystem::filesystem;
 use builtins::import::import;
 use builtins::include_directories::include_directories;
 use builtins::install_headers::install_headers;
+use builtins::join_paths::join_paths;
 use builtins::machine::{host_machine, target_machine};
 use builtins::meson::{Meson, meson};
+use builtins::option::{get_option, option};
+use builtins::project::{add_project_arguments, project};
 use builtins::run_result::run_command;
+use builtins::subdir::subdir;
+use builtins::variable::{get_variable, is_variable, set_variable};
 
 pub mod error;
 
 pub use error::InterpreterError;
-use error::{bail_runtime_error, bail_type_error};
+use error::{ErrorContext as _, bail_runtime_error, bail_type_error};
 
 #[derive(Debug, Clone)]
 pub enum Value {
@@ -172,6 +177,7 @@ pub trait MesonObject: fmt::Debug + as_any::AsAny {
         name: &str,
         args: Vec<Value>,
         kwargs: HashMap<String, Value>,
+        interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError>;
     fn clone_rc(&self) -> Rc<RefCell<dyn MesonObject>>;
     fn to_string(&self) -> String {
@@ -381,7 +387,7 @@ impl Interpreter {
                 .variables
                 .get(&name)
                 .cloned()
-                .ok_or(InterpreterError::UndefinedVariable(name.into())),
+                .ok_or(InterpreterError::UndefinedVariable(name)),
             AstValue::FunctionCall(name, args, kwargs) => self.call_function(&name, args, kwargs),
             AstValue::MethodCall(object, method, args, kwargs) => {
                 let obj = self.evaluate_value(*object)?;
@@ -431,212 +437,32 @@ impl Interpreter {
 
         // Built-in functions
         match name {
-            "project" => {
-                // Project definition
-                let Some(Value::String(_project_name)) = eval_args.first() else {
-                    bail_type_error!("First argument to project must be a string");
-                };
-
-                let project_version = match eval_kwargs.get("version") {
-                    Some(Value::String(v)) => v.clone(),
-                    None => "0.0.0".to_string(),
-                    Some(_) => {
-                        bail_type_error!("Expected 'version' keyword argument to be a string");
-                    }
-                };
-
-                self.meson.borrow_mut().project_version = project_version;
-
-                Ok(Value::None)
-            }
-            "option" => {
-                let opt: String = eval_args
-                    .first()
-                    .context_type("First argument to option must be a string")?
-                    .as_string()?
-                    .into();
-
-                let typ = eval_kwargs
-                    .get("type")
-                    .context_type("Option requires a 'type' keyword argument")?
-                    .as_string()?;
-
-                let value = eval_kwargs.get("value");
-                let value = match typ {
-                    "boolean" => {
-                        let bool_value = value.unwrap_or(&Value::Boolean(true)).as_bool()?;
-                        Value::Boolean(bool_value)
-                    }
-                    "integer" => {
-                        let int_value = value.unwrap_or(&Value::Integer(0)).as_integer()?;
-                        Value::Integer(int_value)
-                    }
-                    "string" | "combo" => {
-                        let string_value = value
-                            .unwrap_or(&Value::String(String::new()))
-                            .as_string()?
-                            .into();
-                        Value::String(string_value)
-                    }
-                    "array" => {
-                        let arr_value = value
-                            .unwrap_or(&Value::Array(vec![]))
-                            .as_array()?
-                            .iter()
-                            .map(|v| Ok(Value::String(v.as_string()?.into())))
-                            .collect::<Result<Vec<Value>, _>>()?;
-                        Value::Array(arr_value)
-                    }
-                    ty => bail_type_error!("Unsupported option type: {ty}"),
-                };
-
-                self.options.insert(opt, value);
-
-                Ok(Value::None)
-            }
-            "get_option" => {
-                if let Some(Value::String(opt)) = eval_args.first() {
-                    // Return a default value for options
-                    Ok(match opt.as_str() {
-                        "buildtype" => Value::String("debug".to_string()),
-                        "prefix" => Value::String("/usr/local".to_string()),
-                        "libdir" => Value::String("lib".to_string()),
-                        "includedir" => Value::String("include".to_string()),
-                        //_ if opt.ends_with("-tests") => Value::Boolean(false),
-                        _ => self.options.get(opt).unwrap_or(&Value::None).cloned(),
-                    })
-                } else {
-                    Ok(Value::None)
-                }
-            }
-            "import" => import(eval_args, eval_kwargs),
-            "run_command" => run_command(eval_args, eval_kwargs),
-            "set_variable" => {
-                if eval_args.len() != 2 {
-                    bail_runtime_error!("set_variable requires 2 arguments");
-                }
-                let Some(Value::String(name)) = eval_args.first() else {
-                    bail_type_error!("First argument to set_variable must be a string");
-                };
-                let value = eval_args.get(1).unwrap_or(&Value::None).cloned();
-                self.variables.insert(name.clone(), value);
-                Ok(Value::None)
-            }
-            "configuration_data" => configuration_data(eval_args, eval_kwargs),
-            "configure_file" => configure_file(eval_args, eval_kwargs),
-            "is_variable" => {
-                if let Some(Value::String(var)) = eval_args.first() {
-                    Ok(Value::Boolean(self.variables.contains_key(var)))
-                } else {
-                    Ok(Value::Boolean(false))
-                }
-            }
-            "get_variable" => {
-                if let Some(Value::String(var)) = eval_args.first() {
-                    match self.variables.get(var) {
-                        Some(value) => Ok(value.clone()),
-                        None => match eval_args.get(1).cloned() {
-                            Some(v) => Ok(v),
-                            None => {
-                                Err(InterpreterError::UndefinedVariable(var.to_string().into()))
-                            }
-                        },
-                    }
-                } else {
-                    bail_type_error!("First argument to get_variable must be a string");
-                }
-            }
-            "include_directories" => include_directories(eval_args, eval_kwargs),
-            "add_project_arguments" => {
-                // Ignore for now
-                // TODO: Implement this
-                Ok(Value::None)
-            }
-            "files" => files(eval_args, eval_kwargs),
-            "subdir" => {
-                let Some(Value::String(dir)) = eval_args.first() else {
-                    bail_type_error!("First argument to subdir must be a string");
-                };
-                let pwd = env::current_dir().unwrap();
-                struct Restore(PathBuf);
-                impl Drop for Restore {
-                    fn drop(&mut self) {
-                        env::set_current_dir(&self.0).unwrap();
-                    }
-                }
-                let _restore = Restore(pwd.clone());
-                env::set_current_dir(dir)
-                    .with_context_runtime(|| format!("Failed to change directory to {}", dir))?;
-                let meson_code =
-                    std::fs::read_to_string("meson.build").with_context_runtime(|| {
-                        format!("Failed to read meson.build in subdir {}", dir)
-                    })?;
-                let statements = crate::parser::parse_meson_file(&meson_code)
-                    .with_context_runtime(|| {
-                        format!("Failed to parse meson.build in subdir {}", dir)
-                    })?;
-                self.interpret(statements)?;
-                Ok(Value::None)
-            }
-            "environment" => environment(eval_args, eval_kwargs),
-            "join_paths" => {
-                let mut path = PathBuf::new();
-                for part in &eval_args {
-                    let part = part
-                        .as_string()
-                        .context_type("All arguments to join_paths must be strings")?;
-                    path.push(part);
-                }
-                // Path joining in Meson
-                Ok(Value::String(path.to_string_lossy().to_string()))
-            }
-            "static_library" => static_library(eval_args, eval_kwargs),
-            "executable" => executable(eval_args, eval_kwargs),
-            "custom_target" => {
-                // TODO: implement custom_target
-                Ok(Value::None)
-            }
-            "find_program" => find_program(eval_args, eval_kwargs),
-            "install_headers" => install_headers(eval_args, eval_kwargs),
-            "assert" => {
-                let Some(Value::Boolean(cond)) = eval_args.first() else {
-                    bail_type_error!("First argument to assert must be a boolean");
-                };
-                if !cond {
-                    let msg = if eval_args.len() >= 2 {
-                        let msg = eval_args[1].coerce_string();
-                        format!("Assertion failed: {}", msg.trim_matches('"'))
-                    } else {
-                        "Assertion failed".to_string()
-                    };
-                    bail_runtime_error!("Assert failure: {msg}");
-                }
-                Ok(Value::None)
-            }
-            "message" => {
-                for arg in eval_args {
-                    print!("{} ", arg.coerce_string());
-                }
-                println!();
-                Ok(Value::None)
-            }
-            "error" => {
-                let msg = eval_args
-                    .iter()
-                    .map(|v| v.coerce_string())
-                    .collect::<Vec<_>>()
-                    .join(" ");
-                bail_runtime_error!("{msg}");
-            }
-            "warning" => {
-                print!("WARNING: ");
-                for arg in eval_args {
-                    print!("{} ", arg.coerce_string());
-                }
-                println!();
-                Ok(Value::None)
-            }
-            _ => Err(InterpreterError::UndefinedFunction(name.to_string().into())),
+            "project" => project(eval_args, eval_kwargs, self),
+            "option" => option(eval_args, eval_kwargs, self),
+            "get_option" => get_option(eval_args, eval_kwargs, self),
+            "import" => import(eval_args, eval_kwargs, self),
+            "run_command" => run_command(eval_args, eval_kwargs, self),
+            "set_variable" => set_variable(eval_args, eval_kwargs, self),
+            "configuration_data" => configuration_data(eval_args, eval_kwargs, self),
+            "configure_file" => configure_file(eval_args, eval_kwargs, self),
+            "is_variable" => is_variable(eval_args, eval_kwargs, self),
+            "get_variable" => get_variable(eval_args, eval_kwargs, self),
+            "include_directories" => include_directories(eval_args, eval_kwargs, self),
+            "add_project_arguments" => add_project_arguments(eval_args, eval_kwargs, self),
+            "files" => files(eval_args, eval_kwargs, self),
+            "subdir" => subdir(eval_args, eval_kwargs, self),
+            "environment" => environment(eval_args, eval_kwargs, self),
+            "join_paths" => join_paths(eval_args, eval_kwargs, self),
+            "static_library" => static_library(eval_args, eval_kwargs, self),
+            "executable" => executable(eval_args, eval_kwargs, self),
+            "custom_target" => custom_target(eval_args, eval_kwargs, self),
+            "find_program" => find_program(eval_args, eval_kwargs, self),
+            "install_headers" => install_headers(eval_args, eval_kwargs, self),
+            "assert" => assert(eval_args, eval_kwargs, self),
+            "message" => message(eval_args, eval_kwargs, self),
+            "error" => error_fn(eval_args, eval_kwargs, self),
+            "warning" => warning(eval_args, eval_kwargs, self),
+            _ => Err(InterpreterError::UndefinedFunction(name.into())),
         }
     }
 
@@ -811,7 +637,7 @@ impl Interpreter {
             },
             Value::Object(ref obj) => {
                 let mut obj = obj.as_ref().borrow_mut();
-                obj.call_method(method, eval_args, eval_kwargs)
+                obj.call_method(method, eval_args, eval_kwargs, self)
             }
             _ => bail_type_error!("Cannot call method '{method}' on {object:?}"),
         }

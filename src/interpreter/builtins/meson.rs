@@ -5,13 +5,15 @@ use hashbrown::HashMap;
 use super::builtin_impl;
 use crate::interpreter::builtins::compiler::get_compiler;
 use crate::interpreter::builtins::version::version;
-use crate::interpreter::{InterpreterError, MesonObject, Value};
+use crate::interpreter::{Interpreter, InterpreterError, MesonObject, Value};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Meson {
     build_dir: PathBuf,
     source_dir: PathBuf,
+    pub project_name: String,
     pub project_version: String,
+    pub project_args: HashMap<String, Vec<String>>,
     is_subproject: bool,
 }
 
@@ -32,6 +34,7 @@ impl Meson {
         &self,
         _args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
+        _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         version("1.3.0")
     }
@@ -40,6 +43,7 @@ impl Meson {
         &self,
         _args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
+        _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         Ok(Value::Boolean(false))
     }
@@ -48,14 +52,16 @@ impl Meson {
         &self,
         args: Vec<Value>,
         kwargs: HashMap<String, Value>,
+        interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
-        get_compiler(args, kwargs)
+        get_compiler(args, kwargs, interp)
     }
 
     fn get_cross_property(
         &self,
         args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
+        _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         // Return the default value (second argument)
         Ok(args.get(1).cloned().unwrap_or(Value::None))
@@ -65,6 +71,7 @@ impl Meson {
         &self,
         _args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
+        _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         Ok(Value::String(self.project_version.clone()))
     }
@@ -73,6 +80,7 @@ impl Meson {
         &self,
         _args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
+        _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         Ok(Value::String(self.build_dir.to_string_lossy().into_owned()))
     }
@@ -81,6 +89,7 @@ impl Meson {
         &self,
         _args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
+        _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         Ok(Value::String(
             self.source_dir.to_string_lossy().into_owned(),
@@ -92,7 +101,9 @@ pub fn meson(build_dir: impl Into<PathBuf>, source_dir: impl Into<PathBuf>) -> M
     Meson {
         build_dir: build_dir.into(),
         source_dir: source_dir.into(),
+        project_name: "".into(),
         project_version: "0.0.0".into(),
+        project_args: HashMap::new(),
         is_subproject: false,
     }
 }

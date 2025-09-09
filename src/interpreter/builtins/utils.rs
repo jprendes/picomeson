@@ -1,10 +1,6 @@
-use core::slice::Iter;
-
 use crate::interpreter::Value;
 
-pub fn flatten<'a>(
-    args: impl IntoIterator<Item = &'a Value, IntoIter = Iter<'a, Value>>,
-) -> Flatten<'a> {
+pub fn flatten<'a>(args: &'a (impl AsValueSlice<'a> + ?Sized)) -> Flatten<'a> {
     Flatten::new(args)
 }
 
@@ -12,10 +8,35 @@ pub struct Flatten<'a> {
     args_stack: Vec<&'a [Value]>,
 }
 
+pub trait AsValueSlice<'a> {
+    fn as_slice(&'a self) -> &'a [Value];
+}
+
+impl<'a> AsValueSlice<'a> for Vec<Value> {
+    fn as_slice(&'a self) -> &'a [Value] {
+        self.as_ref()
+    }
+}
+
+impl<'a> AsValueSlice<'a> for [Value] {
+    fn as_slice(&'a self) -> &'a [Value] {
+        self
+    }
+}
+
+impl<'a> AsValueSlice<'a> for Option<&Value> {
+    fn as_slice(&'a self) -> &'a [Value] {
+        match *self {
+            Some(v) => std::slice::from_ref(v),
+            None => &[],
+        }
+    }
+}
+
 impl<'a> Flatten<'a> {
-    fn new(args: impl IntoIterator<Item = &'a Value, IntoIter = Iter<'a, Value>>) -> Flatten<'a> {
+    fn new<'b: 'a>(args: &'b (impl AsValueSlice<'a> + ?Sized)) -> Flatten<'a> {
         Flatten {
-            args_stack: vec![args.into_iter().as_slice()],
+            args_stack: vec![args.as_slice()],
         }
     }
 }

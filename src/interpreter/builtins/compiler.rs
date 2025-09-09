@@ -7,7 +7,7 @@ use super::builtin_impl;
 use crate::interpreter::builtins::utils::flatten;
 use crate::interpreter::error::ErrorContext as _;
 use crate::interpreter::{
-    InterpreterError, MesonObject, Value, bail_runtime_error, bail_type_error,
+    Interpreter, InterpreterError, MesonObject, Value, bail_runtime_error, bail_type_error,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -36,6 +36,7 @@ impl Compiler {
         &self,
         _args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
+        _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         // TODO: actually detect compiler
         Ok(Value::String("cc".to_string()))
@@ -45,6 +46,7 @@ impl Compiler {
         &self,
         _args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
+        _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         // TODO: actually detect linker
         Ok(Value::String("ld.lld".to_string()))
@@ -54,6 +56,7 @@ impl Compiler {
         &self,
         _args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
+        _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         Ok(Value::Array(
             self.command.iter().cloned().map(Value::String).collect(),
@@ -64,6 +67,7 @@ impl Compiler {
         &self,
         args: Vec<Value>,
         kwargs: HashMap<String, Value>,
+        interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         let Some(Value::String(argument)) = args.first() else {
             bail_type_error!("has_argument requires a string argument");
@@ -76,7 +80,7 @@ impl Compiler {
             }
         };
 
-        let result = self.try_compile(&["-c"], &[argument], "")?;
+        let result = self.try_compile(&["-c"], &[argument], "", interp)?;
         let supported = result.success;
 
         if supported || !required {
@@ -90,6 +94,7 @@ impl Compiler {
         &self,
         args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
+        interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         let args = flatten(&args)
             .map(|v| {
@@ -100,7 +105,7 @@ impl Compiler {
 
         let args = args
             .into_iter()
-            .filter_map(|arg| match self.try_compile(&["-c"], &[arg], "") {
+            .filter_map(|arg| match self.try_compile(&["-c"], &[arg], "", interp) {
                 Ok(TryCompileResult { success, .. }) => success.then_some(Ok(arg)),
                 Err(e) => Some(Err(e)),
             })
@@ -114,6 +119,7 @@ impl Compiler {
         &self,
         args: Vec<Value>,
         kwargs: HashMap<String, Value>,
+        interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         let Some(Value::String(function)) = args.first() else {
             bail_type_error!("has_function requires a string argument");
@@ -123,7 +129,7 @@ impl Compiler {
 
         let code = format!("int main() {{ void *p = (void*)({function}); return 0; }}");
 
-        let supported = self.try_compile(&[], &extra_args, &code)?.success;
+        let supported = self.try_compile(&[], &extra_args, &code, interp)?.success;
 
         Ok(Value::Boolean(supported))
     }
@@ -132,6 +138,7 @@ impl Compiler {
         &self,
         args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
+        interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         let Some(Value::String(argument)) = args.first() else {
             bail_type_error!("has_link_argument requires a string argument");
@@ -139,7 +146,7 @@ impl Compiler {
 
         let code = "int main() { return 0; }";
 
-        let supported = self.try_compile(&[], &[argument], code)?.success;
+        let supported = self.try_compile(&[], &[argument], code, interp)?.success;
 
         Ok(Value::Boolean(supported))
     }
@@ -148,6 +155,7 @@ impl Compiler {
         &self,
         args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
+        interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         let args = flatten(&args)
             .map(|v| {
@@ -158,7 +166,7 @@ impl Compiler {
 
         let code = "int main() { return 0; }";
 
-        let supported = self.try_compile(&[], &args, code)?.success;
+        let supported = self.try_compile(&[], &args, code, interp)?.success;
 
         Ok(Value::Boolean(supported))
     }
@@ -167,6 +175,7 @@ impl Compiler {
         &self,
         _args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
+        interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         let delimiter = r#""MESON_HAVE_UNDERSCORE_DELIMITER" "#;
         let code = format!(
@@ -179,17 +188,20 @@ impl Compiler {
 {delimiter}MESON_UNDERSCORE_PREFIX
 "
         );
-        let result = self.try_compile(&["-c", "-E"], &[], &code)?;
+        let result = self.try_compile(&["-c", "-E"], &[], &code, interp)?;
         let output = String::from_utf8_lossy(&result.artifact);
         let suffix = output.rsplit_once(delimiter).map(|(_, s)| s.trim());
         match suffix {
             Some("_") => Ok(Value::Boolean(true)),
             Some("") => Ok(Value::Boolean(false)),
-            _ => self.symbols_have_underscore_prefix_searchbin(),
+            _ => self.symbols_have_underscore_prefix_searchbin(interp),
         }
     }
 
-    fn symbols_have_underscore_prefix_searchbin(&self) -> Result<Value, InterpreterError> {
+    fn symbols_have_underscore_prefix_searchbin(
+        &self,
+        interp: &Interpreter,
+    ) -> Result<Value, InterpreterError> {
         let symbol_name = "meson_uscore_prefix";
         let code = format!(
             "
@@ -202,7 +214,7 @@ void {symbol_name}(void) {{}}
 #endif
 "
         );
-        let artifact = self.try_compile(&["-c"], &[], &code)?.artifact;
+        let artifact = self.try_compile(&["-c"], &[], &code, interp)?.artifact;
         let artifact = String::from_utf8_lossy(&artifact);
         if artifact.contains(&format!("_{symbol_name}")) {
             Ok(Value::Boolean(true))
@@ -219,6 +231,7 @@ void {symbol_name}(void) {{}}
         &self,
         args: Vec<Value>,
         kwargs: HashMap<String, Value>,
+        interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         let Some(Value::String(code)) = args.first() else {
             bail_type_error!("compiles requires a string argument");
@@ -226,7 +239,9 @@ void {symbol_name}(void) {{}}
 
         let extra_args = get_extra_args(&kwargs)?;
 
-        let success = self.try_compile(&["-c"], &extra_args, code)?.success;
+        let success = self
+            .try_compile(&["-c"], &extra_args, code, interp)?
+            .success;
 
         Ok(Value::Boolean(success))
     }
@@ -235,6 +250,7 @@ void {symbol_name}(void) {{}}
         &self,
         args: Vec<Value>,
         kwargs: HashMap<String, Value>,
+        interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         let Some(Value::String(code)) = args.first() else {
             bail_type_error!("links requires a string argument");
@@ -242,7 +258,7 @@ void {symbol_name}(void) {{}}
 
         let extra_args = get_extra_args(&kwargs)?;
 
-        let success = self.try_compile(&[], &extra_args, code)?.success;
+        let success = self.try_compile(&[], &extra_args, code, interp)?.success;
 
         Ok(Value::Boolean(success))
     }
@@ -252,6 +268,7 @@ void {symbol_name}(void) {{}}
         args: &[&str],
         extra_args: &[&str],
         code: &str,
+        interp: &Interpreter,
     ) -> Result<TryCompileResult, InterpreterError> {
         use std::io::Write;
 
@@ -263,11 +280,20 @@ void {symbol_name}(void) {{}}
             ));
         };
 
+        let project_args = interp
+            .meson
+            .borrow()
+            .project_args
+            .get("c")
+            .cloned()
+            .unwrap_or_default();
+
         let mut cmd = Command::new(arg0);
 
         let out_path = tmp_dir.path().join("output");
         cmd.args(&self.command[1..])
             .args(args)
+            .args(project_args)
             .args(["-xc", "-", "-o"])
             .arg(&out_path)
             .args(extra_args)
@@ -291,10 +317,7 @@ void {symbol_name}(void) {{}}
         let artifact = std::fs::read(&out_path).unwrap_or_default();
         let success = output.status.success();
 
-        Ok(TryCompileResult {
-            success,
-            artifact,
-        })
+        Ok(TryCompileResult { success, artifact })
     }
 }
 
@@ -324,6 +347,7 @@ fn get_extra_args(kwargs: &HashMap<String, Value>) -> Result<Vec<&str>, Interpre
 pub fn get_compiler(
     args: Vec<Value>,
     _kwargs: HashMap<String, Value>,
+    _interp: &mut Interpreter,
 ) -> Result<Value, InterpreterError> {
     let Some(Value::String(lang)) = args.first() else {
         return Err(InterpreterError::TypeError(

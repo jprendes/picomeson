@@ -3,11 +3,12 @@ use std::path::PathBuf;
 use hashbrown::HashMap;
 
 use crate::interpreter::builtins::files::files_impl;
-use crate::interpreter::{InterpreterError, Value};
+use crate::interpreter::{Interpreter, InterpreterError, Value};
 
 pub fn install_headers(
     args: Vec<Value>,
     kwargs: HashMap<String, Value>,
+    _interp: &mut Interpreter,
 ) -> Result<Value, InterpreterError> {
     let headers = files_impl(&args)?;
 

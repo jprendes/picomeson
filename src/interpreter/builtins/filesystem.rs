@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use hashbrown::HashMap;
 
 use super::builtin_impl;
-use crate::interpreter::{InterpreterError, MesonObject, Value};
+use crate::interpreter::{Interpreter, InterpreterError, MesonObject, Value};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FileSystem;
@@ -17,6 +17,7 @@ impl FileSystem {
         &self,
         args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
+        _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         let Some(Value::String(path)) = args.first() else {
             return Err(InterpreterError::TypeError(
@@ -30,6 +31,7 @@ impl FileSystem {
         &self,
         args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
+        _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         let Some(Value::String(path)) = args.first() else {
             return Err(InterpreterError::TypeError(
@@ -43,6 +45,7 @@ impl FileSystem {
         &self,
         args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
+        _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         let Some(Value::String(path)) = args.first() else {
             return Err(InterpreterError::TypeError(
@@ -56,6 +59,7 @@ impl FileSystem {
         &self,
         args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
+        _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         let Some(Value::String(path)) = args.first() else {
             return Err(InterpreterError::TypeError(
