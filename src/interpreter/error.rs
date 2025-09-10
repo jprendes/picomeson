@@ -1,3 +1,4 @@
+use alloc::string::ToString;
 use core::fmt;
 use core::fmt::Display;
 
@@ -10,16 +11,19 @@ pub enum InterpreterError {
 }
 
 macro_rules! bail_type_error {
-    ($msg:expr, $($arg:tt)*) => { return Err(InterpreterError::TypeError(format!($msg, $($arg)*).into())) };
-    ($msg:expr) =>              { return Err(InterpreterError::TypeError(format!($msg).into())) };
+    ($msg:expr, $($arg:tt)*) => { return Err(InterpreterError::TypeError(alloc::format!($msg, $($arg)*).into())) };
+    ($msg:expr) =>              { return Err(InterpreterError::TypeError(alloc::format!($msg).into())) };
     () =>                       { return Err(InterpreterError::TypeError("Type mismatch".into())) };
 }
 
 macro_rules! bail_runtime_error {
-    ($msg:expr, $($arg:tt)*) => { return Err(InterpreterError::RuntimeError(format!($msg, $($arg)*).into())) };
-    ($msg:expr) =>              { return Err(InterpreterError::RuntimeError(format!($msg).into())) };
+    ($msg:expr, $($arg:tt)*) => { return Err(InterpreterError::RuntimeError(alloc::format!($msg, $($arg)*).into())) };
+    ($msg:expr) =>              { return Err(InterpreterError::RuntimeError(alloc::format!($msg).into())) };
     () =>                       { return Err(InterpreterError::RuntimeError("Runtime error".into())) };
 }
+
+use alloc::format;
+use alloc::string::String;
 
 pub(crate) use {bail_runtime_error, bail_type_error};
 

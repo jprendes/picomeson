@@ -1,3 +1,6 @@
+use alloc::string::String;
+use alloc::vec::Vec;
+
 use hashbrown::HashMap;
 
 use crate::interpreter::builtins::utils::flatten;
@@ -28,8 +31,8 @@ pub fn project(
         .context_type("Expected 'version' keyword argument to be a string")?;
 
     let mut meson = interp.meson.borrow_mut();
-    meson.project_version = project_version.to_string();
-    meson.project_name = project_name.to_string();
+    meson.project_version = project_version.into();
+    meson.project_name = project_name.into();
 
     Ok(Value::None)
 }
@@ -49,10 +52,8 @@ pub fn add_project_arguments(
         .collect::<Result<Vec<_>, _>>()?;
 
     let mut meson = interp.meson.borrow_mut();
-    for lang in &language {
-        meson
-            .project_args
-            .insert(lang.to_string(), arguments.clone());
+    for lang in language {
+        meson.project_args.insert(lang.into(), arguments.clone());
     }
     Ok(Value::None)
 }

@@ -1,3 +1,6 @@
+use alloc::vec;
+use alloc::vec::Vec;
+
 use crate::interpreter::Value;
 
 pub fn flatten<'a>(args: &'a (impl AsValueSlice<'a> + ?Sized)) -> Flatten<'a> {

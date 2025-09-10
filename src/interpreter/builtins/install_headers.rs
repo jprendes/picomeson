@@ -1,3 +1,7 @@
+use alloc::format;
+use alloc::string::String;
+use alloc::vec::Vec;
+
 use hashbrown::HashMap;
 
 use crate::interpreter::builtins::files::files_impl;
@@ -19,7 +23,9 @@ pub fn install_headers(
         .unwrap_or("");
 
     // TODO: do something with this
-    println!("Installing headers at {install_dir:?}:\n{headers:?}");
+    interp.os.print(&format!(
+        "Installing headers at {install_dir:?}:\n{headers:?}\n"
+    ));
 
     Ok(Value::None)
 }

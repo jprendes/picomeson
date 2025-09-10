@@ -1,3 +1,6 @@
+use alloc::string::String;
+use alloc::vec::Vec;
+
 use hashbrown::HashMap;
 
 use super::builtin_impl;

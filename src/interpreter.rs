@@ -1,4 +1,7 @@
+use alloc::format;
 use alloc::rc::Rc;
+use alloc::string::{String, ToString as _};
+use alloc::vec::Vec;
 use core::cell::{Ref, RefCell};
 use core::fmt;
 
@@ -21,7 +24,7 @@ use builtins::import::import;
 use builtins::include_directories::include_directories;
 use builtins::install_headers::install_headers;
 use builtins::join_paths::join_paths;
-use builtins::machine::{host_machine, target_machine};
+use builtins::machine::{build_machine, host_machine};
 use builtins::meson::{Meson, meson};
 use builtins::option::{get_option, option};
 use builtins::project::{add_project_arguments, project};
@@ -213,12 +216,19 @@ pub struct Interpreter {
     continue_flag: bool,
     meson: Rc<RefCell<Meson>>,
     current_dir: String,
-    os_env: Box<dyn Os>,
+    os: Rc<dyn Os>,
 }
 
 impl Interpreter {
-    pub fn new(os_env: impl Os) -> Self {
-        let meson = meson(".", "./build");
+    pub fn new(
+        os: Rc<dyn Os>,
+        src_dir: impl Into<String>,
+        build_dir: impl Into<String>,
+    ) -> Result<Self, InterpreterError> {
+        let src_dir = src_dir.into();
+        let build_dir = build_dir.into();
+
+        let meson = meson(&src_dir, build_dir);
         let meson = Rc::new(RefCell::new(meson));
 
         let mut interpreter = Self {
@@ -227,39 +237,44 @@ impl Interpreter {
             break_flag: false,
             continue_flag: false,
             meson,
-            current_dir: ".".into(),
-            os_env: Box::new(os_env),
+            current_dir: src_dir,
+            os,
         };
 
         // Initialize built-in variables
-        interpreter.init_builtins();
-        interpreter
+        interpreter.init_builtins()?;
+
+        Ok(interpreter)
     }
 
-    fn init_builtins(&mut self) {
+    fn init_builtins(&mut self) -> Result<(), InterpreterError> {
         // Meson object
         self.variables
             .insert("meson".to_string(), Value::Object(self.meson.clone()));
 
-        // Host machine
-        self.variables
-            .insert("host_machine".to_string(), host_machine(self).into_object());
-
-        // Target machine
-        self.variables.insert(
-            "target_machine".to_string(),
-            target_machine(self).into_object(),
-        );
-
-        // Build machine (same as host for now)
+        // Build machine (the machine where Meson is running)
         self.variables.insert(
             "build_machine".to_string(),
-            host_machine(self).into_object(),
+            build_machine(self)?.into_object(),
+        );
+
+        // Host machine (the machine where the built programs will run)
+        self.variables.insert(
+            "host_machine".to_string(),
+            host_machine(self)?.into_object(),
+        );
+
+        // Target machine (when building a compiler, the machine the compiler will generate code for)
+        self.variables.insert(
+            "target_machine".to_string(),
+            host_machine(self)?.into_object(),
         );
 
         // File system object
         self.variables
             .insert("fs".to_string(), filesystem().into_object());
+
+        Ok(())
     }
 
     pub fn interpret(&mut self, statements: Vec<Statement>) -> Result<(), InterpreterError> {
@@ -271,6 +286,22 @@ impl Interpreter {
             }
         }
         Ok(())
+    }
+
+    pub fn interpret_file(&mut self, file_path: &str) -> Result<(), InterpreterError> {
+        let contents = self
+            .os
+            .read_file(file_path)
+            .with_context_runtime(|| format!("Failed to read file {file_path:?}"))?;
+        let contents = String::from_utf8(contents)
+            .with_context_runtime(|| format!("File is not utf-8 encoded: {file_path:?}"))?;
+        self.interpret_string(&contents)
+    }
+
+    pub fn interpret_string(&mut self, contents: &str) -> Result<(), InterpreterError> {
+        let statements =
+            crate::parser::parse_meson_file(contents).context_runtime("Failed to parse")?;
+        self.interpret(statements)
     }
 
     fn execute_statement(&mut self, statement: Statement) -> Result<(), InterpreterError> {
@@ -556,7 +587,10 @@ impl Interpreter {
                     }
                     (Value::String(a), Value::String(b)) => {
                         // Path joining in Meson
-                        let joined = self.os_env.join_paths(&[a, b]);
+                        let joined = self
+                            .os
+                            .join_paths(&[a, b])
+                            .context_runtime("Failed to join paths")?;
                         Ok(Value::String(joined))
                     }
                     _ => bail_type_error!("Invalid operands for division"),
@@ -706,13 +740,4 @@ impl Interpreter {
             _ => bail_type_error!("Cannot add incompatible types {left:?} + {right:?}"),
         }
     }
-}
-
-// Helper function to run interpreter on parsed AST
-pub fn run_interpreter(
-    os_env: impl Os,
-    statements: Vec<Statement>,
-) -> Result<(), InterpreterError> {
-    let mut interpreter = Interpreter::new(os_env);
-    interpreter.interpret(statements)
 }

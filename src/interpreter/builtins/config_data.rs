@@ -1,3 +1,7 @@
+use alloc::format;
+use alloc::string::String;
+use alloc::vec::Vec;
+
 use hashbrown::HashMap;
 
 use super::builtin_impl;
@@ -122,7 +126,7 @@ impl MesonObject for ConfigData {
 pub fn configure_file(
     _args: Vec<Value>,
     kwargs: HashMap<String, Value>,
-    _interp: &mut Interpreter,
+    interp: &mut Interpreter,
 ) -> Result<Value, InterpreterError> {
     let input = match kwargs.get("input") {
         Some(Value::String(s)) => Some(s.clone()),
@@ -142,8 +146,11 @@ pub fn configure_file(
         // TODO: implement this
         return Ok(Value::None);
     }
+    let mut data = configuration.data.iter().collect::<Vec<_>>();
+    data.sort_by_key(|a| a.0);
+
     let mut content = String::from("#pragma once\n\n");
-    for (key, (value, desc)) in configuration.data.iter() {
+    for (key, (value, desc)) in data.iter() {
         if !desc.is_empty() {
             content.push_str(&format!("// {}\n", desc));
         }
@@ -164,9 +171,12 @@ pub fn configure_file(
         }
         content.push('\n');
     }
+
     // TODO: Actualy output this file, and handle paths correctly
-    println!("Should be writing output file: {}", output);
-    println!("With content:\n{}", content);
+    interp
+        .os
+        .print(&format!("Should be writing output file: {}", output));
+    interp.os.print(&format!("With content:\n{}", content));
 
     Ok(Value::None)
 }

@@ -1,3 +1,7 @@
+use alloc::string::String;
+use alloc::vec;
+use alloc::vec::Vec;
+
 use hashbrown::HashMap;
 
 use crate::interpreter::error::{ErrorContext as _, bail_type_error};

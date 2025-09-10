@@ -1,11 +1,12 @@
-use std::process::Command;
+use alloc::format;
+use alloc::string::String;
+use alloc::vec::Vec;
 
 use hashbrown::HashMap;
 
 use super::builtin_impl;
-use crate::interpreter::{
-    Interpreter, InterpreterError, MesonObject, Value, bail_runtime_error, bail_type_error,
-};
+use crate::interpreter::error::ErrorContext;
+use crate::interpreter::{Interpreter, InterpreterError, MesonObject, Value};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExternalProgram {
@@ -42,27 +43,16 @@ impl MesonObject for ExternalProgram {
 pub fn find_program(
     args: Vec<Value>,
     kwargs: HashMap<String, Value>,
-    _interp: &mut Interpreter,
+    interp: &mut Interpreter,
 ) -> Result<Value, InterpreterError> {
-    let Some(Value::String(prog)) = args.first() else {
-        return Err(InterpreterError::TypeError(
-            "Expected a string as the first argument".into(),
-        ));
-    };
+    let prog = args
+        .first()
+        .context_type("Expected a string as the first argument")?
+        .as_string()
+        .context_type("Expected a string as the first argument")?;
 
     // Simple check if program exists in PATH
-    let full_path = Command::new("which")
-        .arg(prog)
-        .output()
-        .map(|o| {
-            o.status.success().then_some(
-                String::from_utf8_lossy(&o.stdout)
-                    .as_ref()
-                    .trim()
-                    .to_string(),
-            )
-        })
-        .unwrap_or(None);
+    let full_path = interp.os.find_program(prog, &interp.current_dir).ok();
 
     let found = full_path.is_some();
 
@@ -72,9 +62,17 @@ pub fn find_program(
         return Ok(program);
     }
 
-    match kwargs.get("required") {
-        None | Some(Value::Boolean(false)) => Ok(program),
-        Some(Value::Boolean(true)) => bail_runtime_error!("Program '{prog}' not found"),
-        _ => bail_type_error!("The 'required' keyword argument must be a boolean"),
+    let required = kwargs
+        .get("required")
+        .map(Value::as_bool)
+        .transpose()?
+        .unwrap_or(false);
+
+    if required {
+        return Err(InterpreterError::RuntimeError(format!(
+            "Program '{prog}' not found"
+        )));
     }
+
+    Ok(program)
 }

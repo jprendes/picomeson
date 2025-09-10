@@ -1,7 +1,8 @@
-use std::process::{Command, Stdio};
+use alloc::format;
+use alloc::string::{String, ToString as _};
+use alloc::vec::Vec;
 
 use hashbrown::HashMap;
-use tempfile::tempdir;
 
 use super::builtin_impl;
 use crate::interpreter::builtins::utils::flatten;
@@ -9,14 +10,15 @@ use crate::interpreter::error::ErrorContext as _;
 use crate::interpreter::{
     Interpreter, InterpreterError, MesonObject, Value, bail_runtime_error, bail_type_error,
 };
+use crate::os::TryCompileOutput;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Compiler {
+    lang: String,
     command: Vec<String>,
 }
 
-const DELIMITER: &str = r#""MESON_DELIMITER" "#;
-const SYMBOL_NAME: &str = "meson_uscore_prefix";
+const DELIMITER: &str = r#""MESON_DELIMITER""#;
 
 impl MesonObject for Compiler {
     builtin_impl!(
@@ -60,7 +62,7 @@ impl Compiler {
         _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         // TODO: actually detect linker
-        Ok(Value::String("ld.lld".to_string()))
+        Ok(Value::String("ld.lld".into()))
     }
 
     fn cmd_array(
@@ -117,7 +119,7 @@ impl Compiler {
         let args = args
             .into_iter()
             .filter_map(|arg| match self.try_compile(&["-c"], &[arg], "", interp) {
-                Ok(TryCompileResult { success, .. }) => success.then_some(Ok(arg)),
+                Ok(TryCompileOutput { success, .. }) => success.then_some(Ok(arg)),
                 Err(e) => Some(Err(e)),
             })
             .map(|arg| arg.map(|v| Value::String(v.to_string())))
@@ -195,25 +197,13 @@ impl Compiler {
         match suffix {
             Some("_") => Ok(Value::Boolean(true)),
             Some("") => Ok(Value::Boolean(false)),
-            _ => self.symbols_have_underscore_prefix_searchbin(interp),
-        }
-    }
-
-    fn symbols_have_underscore_prefix_searchbin(
-        &self,
-        interp: &Interpreter,
-    ) -> Result<Value, InterpreterError> {
-        let code = include_str!("compiler/underscore_prefix2.c");
-        let artifact = self.try_compile(&["-c"], &[], code, interp)?.artifact;
-        let artifact = String::from_utf8_lossy(&artifact);
-        if artifact.contains(&format!("_{SYMBOL_NAME}")) {
-            Ok(Value::Boolean(true))
-        } else if artifact.contains(SYMBOL_NAME) {
-            Ok(Value::Boolean(false))
-        } else {
-            Err(InterpreterError::RuntimeError(
-                "Failed to find symbol in compiler output".into(),
-            ))
+            Some(sym) => Err(InterpreterError::RuntimeError(format!(
+                "Found unexpected underscore prefix {sym:?}"
+            ))),
+            None => Err(InterpreterError::RuntimeError(format!(
+                "Failed to find underscore prefix, {}",
+                String::from_utf8_lossy(&result.artifact)
+            ))),
         }
     }
 
@@ -259,62 +249,72 @@ impl Compiler {
         extra_args: &[&str],
         code: &str,
         interp: &Interpreter,
-    ) -> Result<TryCompileResult, InterpreterError> {
-        use std::io::Write;
-
-        let tmp_dir = tempdir().context_runtime("Failed to create temporary directory")?;
-
-        let Some(arg0) = self.command.first() else {
-            return Err(InterpreterError::RuntimeError(
-                "Compiler command is empty".into(),
-            ));
-        };
-
-        let project_args = interp
-            .meson
-            .borrow()
+    ) -> Result<TryCompileOutput, InterpreterError> {
+        let meson = interp.meson.borrow();
+        let args = args.iter().copied();
+        let project_args = meson
             .project_args
             .get("c")
-            .cloned()
-            .unwrap_or_default();
+            .map(Vec::as_slice)
+            .unwrap_or_default()
+            .iter()
+            .map(String::as_str);
+        let extra_args = extra_args.iter().copied();
 
-        let mut cmd = Command::new(arg0);
+        let all_args = project_args
+            .chain(args)
+            .chain(extra_args)
+            .collect::<Vec<_>>();
 
-        let out_path = tmp_dir.path().join("output");
-        cmd.args(&self.command[1..])
-            .args(args)
-            .args(project_args)
-            .args(["-xc", "-", "-o"])
-            .arg(&out_path)
-            .args(extra_args)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
+        let command = self.command.iter().map(String::as_str);
 
-        let mut child = cmd.spawn().context_runtime("Failed to run compiler")?;
+        let outdir = interp
+            .os
+            .tempdir()
+            .context_runtime("Failed to create temporary directory")?;
 
-        child
-            .stdin
-            .take()
-            .unwrap()
-            .write_all(code.as_bytes())
-            .context_runtime("Failed to write to compiler stdin")?;
+        let out_path = interp
+            .os
+            .join_paths(&[outdir.path(), "output"])
+            .context_runtime("Failed to create temporary output file path")?;
 
-        let output = child
-            .wait_with_output()
+        let input_filename = match self.lang.as_str() {
+            "c" => "input.c",
+            "cpp" => "input.cpp",
+            _ => {
+                return Err(InterpreterError::RuntimeError(format!(
+                    "Unsupported language: {}",
+                    self.lang
+                )));
+            }
+        };
+        let input = interp
+            .os
+            .join_paths(&[outdir.path(), input_filename])
+            .context_runtime("Failed to create temporary source file path")?;
+        interp
+            .os
+            .write_file(&input, code.as_bytes())
+            .context_runtime("Failed to write temporary source file")?;
+
+        let command = command
+            .chain(all_args.iter().copied())
+            .chain([&input, "-o", &out_path]);
+
+        let result = interp
+            .os
+            .run_command(&command.collect::<Vec<_>>())
             .context_runtime("Failed to run compiler")?;
 
-        let artifact = std::fs::read(&out_path).unwrap_or_default();
-        let success = output.status.success();
+        let artifact = interp.os.read_file(&out_path).unwrap_or_default();
 
-        Ok(TryCompileResult { success, artifact })
+        let result = TryCompileOutput {
+            success: result.returncode == 0,
+            artifact,
+        };
+
+        Ok(result)
     }
-}
-
-#[derive(Debug)]
-struct TryCompileResult {
-    success: bool,
-    artifact: Vec<u8>,
 }
 
 fn get_extra_args(kwargs: &HashMap<String, Value>) -> Result<Vec<&str>, InterpreterError> {
@@ -339,16 +339,20 @@ pub fn get_compiler(
     _kwargs: HashMap<String, Value>,
     interp: &mut Interpreter,
 ) -> Result<Value, InterpreterError> {
-    let Some(Value::String(lang)) = args.first() else {
-        return Err(InterpreterError::TypeError(
-            "Expected a string as the first argument".into(),
-        ));
-    };
+    let lang = args
+        .first()
+        .context_type("Expected a string as the first argument")?
+        .as_string()
+        .context_type("Expected a string as the first argument")?;
 
     let command = interp
-        .os_env
-        .get_compiler(lang.as_str())
+        .os
+        .get_compiler(lang)
         .with_context_runtime(|| format!("Failed to get {lang} compiler"))?;
 
-    Ok(Compiler { command }.into_object())
+    Ok(Compiler {
+        command,
+        lang: lang.into(),
+    }
+    .into_object())
 }

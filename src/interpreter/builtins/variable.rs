@@ -1,3 +1,6 @@
+use alloc::string::String;
+use alloc::vec::Vec;
+
 use hashbrown::HashMap;
 
 use crate::interpreter::error::ErrorContext as _;

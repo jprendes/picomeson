@@ -1,3 +1,6 @@
+use alloc::string::String;
+use alloc::vec::Vec;
+
 use hashbrown::HashMap;
 
 use super::builtin_impl;
@@ -18,14 +21,19 @@ impl FileSystem {
         _kwargs: HashMap<String, Value>,
         interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
-        let Some(Value::String(path)) = args.first() else {
-            return Err(InterpreterError::TypeError(
-                "Expected a string argument".into(),
-            ));
-        };
+        let path = args
+            .first()
+            .context_type("Expected a string argument")?
+            .as_string()
+            .context_type("Expected a string argument")?;
+        let path = interp
+            .os
+            .join_paths(&[&interp.current_dir, path])
+            .context_runtime("Failed to join paths")?;
+
         let is_file = interp
-            .os_env
-            .is_file(path)
+            .os
+            .is_file(&path)
             .context_runtime("Failed to check if path is a file")?;
         Ok(Value::Boolean(is_file))
     }
@@ -36,15 +44,19 @@ impl FileSystem {
         _kwargs: HashMap<String, Value>,
         interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
-        let Some(Value::String(path)) = args.first() else {
-            return Err(InterpreterError::TypeError(
-                "Expected a string argument".into(),
-            ));
-        };
+        let path = args
+            .first()
+            .context_type("Expected a string argument")?
+            .as_string()
+            .context_type("Expected a string argument")?;
+        let path = interp
+            .os
+            .join_paths(&[&interp.current_dir, path])
+            .context_runtime("Failed to join paths")?;
 
         let is_dir = interp
-            .os_env
-            .is_dir(path)
+            .os
+            .is_dir(&path)
             .context_runtime("Failed to check if path is a directory")?;
         Ok(Value::Boolean(is_dir))
     }
@@ -55,15 +67,19 @@ impl FileSystem {
         _kwargs: HashMap<String, Value>,
         interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
-        let Some(Value::String(path)) = args.first() else {
-            return Err(InterpreterError::TypeError(
-                "Expected a string argument".into(),
-            ));
-        };
+        let path = args
+            .first()
+            .context_type("Expected a string argument")?
+            .as_string()
+            .context_type("Expected a string argument")?;
+        let path = interp
+            .os
+            .join_paths(&[&interp.current_dir, path])
+            .context_runtime("Failed to join paths")?;
 
         let exists = interp
-            .os_env
-            .exists(path)
+            .os
+            .exists(&path)
             .context_runtime("Failed to check if path exists")?;
         Ok(Value::Boolean(exists))
     }

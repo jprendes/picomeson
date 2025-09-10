@@ -1,3 +1,6 @@
+use alloc::string::String;
+use alloc::vec::Vec;
+
 use hashbrown::HashMap;
 
 use crate::interpreter::error::ErrorContext as _;
@@ -36,12 +39,14 @@ pub fn assert(
 pub fn message(
     args: Vec<Value>,
     _kwargs: HashMap<String, Value>,
-    _interp: &mut Interpreter,
+    interp: &mut Interpreter,
 ) -> Result<Value, InterpreterError> {
+    let mut output = String::new();
     for arg in args {
-        print!("{} ", arg.coerce_string());
+        output.push_str(&arg.coerce_string());
+        output.push(' ');
     }
-    println!();
+    interp.os.print(&output);
     Ok(Value::None)
 }
 
@@ -61,12 +66,13 @@ pub fn error(
 pub fn warning(
     args: Vec<Value>,
     _kwargs: HashMap<String, Value>,
-    _interp: &mut Interpreter,
+    interp: &mut Interpreter,
 ) -> Result<Value, InterpreterError> {
-    print!("WARNING: ");
+    let mut output = String::from("WARNING: ");
     for arg in args {
-        print!("{} ", arg.coerce_string());
+        output.push_str(&arg.coerce_string());
+        output.push(' ');
     }
-    println!();
+    interp.os.print(&output);
     Ok(Value::None)
 }

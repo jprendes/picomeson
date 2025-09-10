@@ -1,3 +1,6 @@
+use alloc::string::String;
+use alloc::vec::Vec;
+
 use hashbrown::HashMap;
 
 use super::builtin_impl;
@@ -93,7 +96,7 @@ impl Meson {
     }
 }
 
-pub fn meson(build_dir: impl Into<String>, source_dir: impl Into<String>) -> Meson {
+pub fn meson(source_dir: impl Into<String>, build_dir: impl Into<String>) -> Meson {
     Meson {
         build_dir: build_dir.into(),
         source_dir: source_dir.into(),

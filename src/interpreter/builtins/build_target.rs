@@ -1,3 +1,7 @@
+use alloc::format;
+use alloc::string::String;
+use alloc::vec::Vec;
+
 use hashbrown::HashMap;
 
 use crate::interpreter::builtins::builtin_impl;
@@ -62,7 +66,9 @@ pub fn static_library(
         sources,
     };
 
-    println!("Created static library: {:?}", lib);
+    interp
+        .os
+        .print(&format!("Created static library: {:?}", lib));
 
     Ok(lib.into_object())
 }
@@ -85,6 +91,10 @@ pub fn executable(
         target_type: TargetType::Executable,
         sources,
     };
+
+    interp
+        .os
+        .print(&format!("Created executable library: {:?}", bin));
 
     Ok(bin.into_object())
 }

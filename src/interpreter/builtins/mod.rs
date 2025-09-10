@@ -29,7 +29,7 @@ macro_rules! builtin_impl {
             &mut self,
             name: &str,
             _args: alloc::vec::Vec<crate::interpreter::Value>,
-            _kwargs: hashbrown::HashMap<String, crate::interpreter::Value>,
+            _kwargs: hashbrown::HashMap<alloc::string::String, crate::interpreter::Value>,
             _interp: &mut crate::interpreter::Interpreter,
         ) -> Result<crate::interpreter::Value, crate::interpreter::InterpreterError> {
             match name {

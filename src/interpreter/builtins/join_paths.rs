@@ -1,3 +1,6 @@
+use alloc::string::String;
+use alloc::vec::Vec;
+
 use hashbrown::HashMap;
 
 use crate::interpreter::builtins::utils::flatten;
@@ -14,7 +17,10 @@ pub fn join_paths(
         .collect::<Result<Vec<_>, _>>()
         .context_type("All arguments to join_paths must be strings")?;
 
-    let path = interp.os_env.join_paths(&parts);
+    let path = interp
+        .os
+        .join_paths(&parts)
+        .context_runtime("Failed to join paths")?;
 
     Ok(Value::String(path))
 }

@@ -1,3 +1,13 @@
+[workspace]
+resolver = "3"
+members = [
+    "cli",
+]
+
+[workspace.dependencies]
+picomeson = { path = "." }
+anyhow = { version = "1.0.99", default-features = false }
+
 [package]
 name = "picomeson"
 version = "0.1.0"
@@ -6,5 +16,5 @@ edition = "2024"
 [dependencies]
 as-any = "0.3.2"
 semver = { version = "1.0.26", default-features = false }
-tempfile = "3.21.0"
-hashbrown = "0.16.0"
+hashbrown = { version = "0.16.0", features = ["equivalent"] }
+anyhow.workspace = true

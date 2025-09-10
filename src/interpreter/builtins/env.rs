@@ -1,3 +1,6 @@
+use alloc::string::{String, ToString as _};
+use alloc::vec::Vec;
+
 use hashbrown::HashMap;
 
 use super::builtin_impl;
@@ -19,7 +22,7 @@ impl Env {
         &mut self,
         args: Vec<Value>,
         kwargs: HashMap<String, Value>,
-        _interp: &mut Interpreter,
+        interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         let variable = args
             .first()
@@ -29,16 +32,17 @@ impl Env {
 
         let new_values = flatten(&args[1..]).map(|v| v.as_string());
 
-        #[cfg(windows)]
-        const DEFAULT_SEP: &str = ";";
-        #[cfg(not(windows))]
-        const DEFAULT_SEP: &str = ":";
+        let default_separator = interp
+            .os
+            .seppath()
+            .context_runtime("Failed to get system path separator")?;
 
         let separator = kwargs
             .get("separator")
             .map(Value::as_string)
-            .unwrap_or(Ok(DEFAULT_SEP))
-            .context_type("Expected 'separator' keyword argument to be a string")?;
+            .transpose()
+            .context_type("Expected 'separator' keyword argument to be a string")?
+            .unwrap_or(default_separator.as_str());
 
         let old_value = self.vars.get(variable).map(|s| Ok(s.as_str()));
         let values = new_values.chain(old_value).collect::<Result<Vec<_>, _>>()?;

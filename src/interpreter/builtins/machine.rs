@@ -1,6 +1,10 @@
+use alloc::string::String;
+use alloc::vec::Vec;
+
 use hashbrown::HashMap;
 
 use super::builtin_impl;
+use crate::interpreter::error::ErrorContext;
 use crate::interpreter::{Interpreter, InterpreterError, MesonObject, Value};
 use crate::os::MachineInfo;
 
@@ -54,32 +58,38 @@ impl Machine {
     }
 }
 
-pub fn host_machine(interp: &Interpreter) -> Machine {
+pub fn build_machine(interp: &Interpreter) -> Result<Machine, InterpreterError> {
     let MachineInfo {
         system,
         cpu,
         endian,
-    } = interp.os_env.host();
+    } = interp
+        .os
+        .build_machine()
+        .context_runtime("Failed to get build machine info")?;
 
-    Machine {
+    Ok(Machine {
         system,
         cpu_family: cpu.clone(),
         cpu,
         endian,
-    }
+    })
 }
 
-pub fn target_machine(interp: &Interpreter) -> Machine {
+pub fn host_machine(interp: &Interpreter) -> Result<Machine, InterpreterError> {
     let MachineInfo {
         system,
         cpu,
         endian,
-    } = interp.os_env.target();
+    } = interp
+        .os
+        .host_machine()
+        .context_runtime("Failed to get host machine info")?;
 
-    Machine {
+    Ok(Machine {
         system,
         cpu_family: cpu.clone(),
         cpu,
         endian,
-    }
+    })
 }

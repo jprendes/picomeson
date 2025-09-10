@@ -1,3 +1,8 @@
+use alloc::boxed::Box;
+use alloc::string::String;
+use alloc::vec;
+use alloc::vec::Vec;
+
 use hashbrown::HashMap;
 
 pub mod error;
@@ -1150,14 +1155,7 @@ impl Parser {
 // Example usage
 pub fn parse_meson_file(content: &str) -> Result<Vec<Statement>, ParseError> {
     let mut parser = Parser::new(content);
-    match parser.parse() {
-        Ok(statements) => Ok(statements),
-        Err(e) => {
-            println!("Parse error: {}", e);
-            println!("Tokens: {:?}", &parser.tokens[..parser.pos]);
-            Err(e)
-        }
-    }
+    parser.parse()
 }
 
 #[cfg(test)]

@@ -1,9 +1,11 @@
-use std::process::Command;
+use alloc::string::String;
+use alloc::vec::Vec;
 
 use hashbrown::HashMap;
 
 use super::builtin_impl;
 use crate::interpreter::builtins::utils::flatten;
+use crate::interpreter::error::ErrorContext;
 use crate::interpreter::{Interpreter, InterpreterError, MesonObject, Value};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -49,7 +51,7 @@ impl RunResult {
 pub fn run_command(
     args: Vec<Value>,
     _kwargs: HashMap<String, Value>,
-    _interp: &mut Interpreter,
+    interp: &mut Interpreter,
 ) -> Result<Value, InterpreterError> {
     let cmd_args = flatten(&args)
         .map(Value::as_string)
@@ -61,16 +63,15 @@ pub fn run_command(
         ));
     }
 
-    let (stdout, stderr, status_code) = Command::new(cmd_args[0])
-        .args(&cmd_args[1..])
-        .output()
-        .map(|output| (output.stdout, output.stderr, output.status.code()))
-        .unwrap_or_else(|e| (Vec::new(), e.to_string().into_bytes(), Some(1)));
+    let output = interp
+        .os
+        .run_command(&cmd_args)
+        .context_runtime("Failed to run command")?;
 
     Ok(RunResult {
-        stdout: String::from_utf8_lossy(&stdout).to_string(),
-        stderr: String::from_utf8_lossy(&stderr).to_string(),
-        returncode: status_code.unwrap_or(1) as i64,
+        stdout: output.stdout,
+        stderr: output.stderr,
+        returncode: output.returncode,
     }
     .into_object())
 }
