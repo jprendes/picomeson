@@ -10,35 +10,54 @@ use alloc::format;
 use alloc::rc::Rc;
 use alloc::string::String;
 
-pub struct Meson<Os: os::Os> {
-    os: Os,
+use hashbrown::HashMap;
+
+pub struct Meson {
+    os: Rc<dyn os::Os>,
     build_dir: String,
+    options: HashMap<String, String>,
 }
 
-impl<Os: os::Os> Meson<Os> {
-    pub fn new(os: Os) -> Self {
+impl Meson {
+    pub fn new(os: impl os::Os) -> Self {
+        let os = Rc::new(os);
         let build_dir = "build".into();
-        Self { os, build_dir }
+        let options = Default::default();
+        Self {
+            os,
+            build_dir,
+            options,
+        }
     }
 
-    pub fn build(self, src_dir: impl Into<String>) -> anyhow::Result<()> {
-        let os = Rc::new(self.os);
+    pub fn option(&mut self, name: impl Into<String>, value: impl Into<String>) -> &mut Self {
+        self.options.insert(name.into(), value.into());
+        self
+    }
 
+    pub fn build(&self, src_dir: impl Into<String>) -> anyhow::Result<()> {
         let src_dir = src_dir.into();
 
-        let mut interpreter = interpreter::Interpreter::new(os.clone(), &src_dir, self.build_dir)?;
-        interpreter.interpret_string(include_str!("builtin-options.txt"))?;
+        let mut interp = interpreter::Interpreter::new(self.os.clone(), &src_dir, &self.build_dir)?;
 
-        let default_prefix = os.default_prefix()?;
-        interpreter.interpret_string(&format!("option('prefix', type: 'string', value: '{default_prefix}', description: 'Installation prefix')"))?;
+        interp.interpret_string(include_str!("builtin-options.txt"))?;
 
-        let meson_options_path = os.join_paths(&[src_dir.as_str(), "meson_options.txt"])?;
-        if os.exists(&meson_options_path).unwrap_or(false) {
-            interpreter.interpret_file(&meson_options_path)?;
+        let default_prefix = self.os.default_prefix()?;
+        interp.interpret_string(&format!("option('prefix', type: 'string', value: '{default_prefix}', description: 'Installation prefix')"))?;
+
+        let meson_options_path = self
+            .os
+            .join_paths(&[src_dir.as_str(), "meson_options.txt"])?;
+        if self.os.exists(&meson_options_path).unwrap_or(false) {
+            interp.interpret_file(&meson_options_path)?;
         }
 
-        let meson_build_path = os.join_paths(&[src_dir.as_str(), "meson.build"])?;
-        interpreter.interpret_file(&meson_build_path)?;
+        for (name, value) in &self.options {
+            interp.set_option(name, value)?;
+        }
+
+        let meson_build_path = self.os.join_paths(&[src_dir.as_str(), "meson.build"])?;
+        interp.interpret_file(&meson_build_path)?;
 
         Ok(())
     }

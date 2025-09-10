@@ -26,7 +26,7 @@ use builtins::install_headers::install_headers;
 use builtins::join_paths::join_paths;
 use builtins::machine::{build_machine, host_machine};
 use builtins::meson::{Meson, meson};
-use builtins::option::{get_option, option};
+use builtins::option::{BuildOption, OptionType, get_option, option};
 use builtins::project::{add_project_arguments, project};
 use builtins::run_result::run_command;
 use builtins::subdir::subdir;
@@ -211,7 +211,7 @@ pub fn borrow_downcast<'a, T: MesonObject>(
 
 pub struct Interpreter {
     variables: HashMap<String, Value>,
-    options: HashMap<String, Value>,
+    options: HashMap<String, BuildOption>,
     break_flag: bool,
     continue_flag: bool,
     meson: Rc<RefCell<Meson>>,
@@ -739,5 +739,58 @@ impl Interpreter {
             }
             _ => bail_type_error!("Cannot add incompatible types {left:?} + {right:?}"),
         }
+    }
+
+    pub fn set_option(&mut self, name: &str, value: &str) -> Result<(), InterpreterError> {
+        let Some(option) = self.options.get_mut(name) else {
+            bail_runtime_error!("Option '{name}' is not defined");
+        };
+
+        match option.typ {
+            OptionType::Boolean => {
+                let bool_value = value
+                    .parse()
+                    .context_runtime("Invalid value '{value}' for boolean option '{name}'")?;
+                option.value = Value::Boolean(bool_value);
+            }
+            OptionType::Integer(min, max) => {
+                let int_value: i64 = value
+                    .parse()
+                    .context_runtime("Invalid value '{value}' for integer option '{name}'")?;
+                option.value = Value::Integer(int_value.clamp(min, max));
+            }
+            OptionType::String(ref choices) => {
+                let value = value.into();
+                let valid = choices.is_empty() || choices.contains(&value);
+                if !valid {
+                    bail_runtime_error!(
+                        "Invalid value '{value}' for string option '{name}', allowed values are: {choices:?}"
+                    );
+                }
+                option.value = Value::String(choices.first().cloned().unwrap_or_default());
+            }
+            OptionType::Array(ref choices) => {
+                // TODO: check the actual behavior of this
+                let values = value
+                    .split(',')
+                    .map(str::trim)
+                    .map(String::from)
+                    .collect::<Vec<_>>();
+
+                let valid = values
+                    .iter()
+                    .all(|v| choices.is_empty() || choices.contains(v));
+
+                if !valid {
+                    bail_runtime_error!(
+                        "Invalid value '{value}' for array option '{name}', allowed values are: {choices:?}"
+                    );
+                }
+                let values = values.into_iter().map(Value::String).collect::<Vec<_>>();
+                option.value = Value::Array(values);
+            }
+        }
+
+        Ok(())
     }
 }
