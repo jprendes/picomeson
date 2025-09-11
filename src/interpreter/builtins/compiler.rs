@@ -1,6 +1,7 @@
 use alloc::format;
 use alloc::string::{String, ToString as _};
 use alloc::vec::Vec;
+use core::iter;
 
 use hashbrown::HashMap;
 
@@ -10,12 +11,13 @@ use crate::interpreter::error::ErrorContext as _;
 use crate::interpreter::{
     Interpreter, InterpreterError, MesonObject, Value, bail_runtime_error, bail_type_error,
 };
-use crate::os::TryCompileOutput;
+use crate::os::{CompilerInfo, Path, TryCompileOutput};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Compiler {
     lang: String,
-    command: Vec<String>,
+    command: Path,
+    flags: Vec<String>,
 }
 
 const DELIMITER: &str = r#""MESON_DELIMITER""#;
@@ -71,9 +73,11 @@ impl Compiler {
         _kwargs: HashMap<String, Value>,
         _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
-        Ok(Value::Array(
-            self.command.iter().cloned().map(Value::String).collect(),
-        ))
+        let argv = iter::once(self.command.to_string())
+            .chain(self.flags.iter().cloned())
+            .map(Value::String)
+            .collect();
+        Ok(Value::Array(argv))
     }
 
     fn has_argument(
@@ -252,31 +256,23 @@ impl Compiler {
     ) -> Result<TryCompileOutput, InterpreterError> {
         let meson = interp.meson.borrow();
         let args = args.iter().copied();
-        let project_args = meson
+        let cmd_args = meson
             .project_args
             .get("c")
             .map(Vec::as_slice)
             .unwrap_or_default()
             .iter()
             .map(String::as_str);
-        let extra_args = extra_args.iter().copied();
 
-        let all_args = project_args
-            .chain(args)
-            .chain(extra_args)
-            .collect::<Vec<_>>();
-
-        let command = self.command.iter().map(String::as_str);
+        let cmd_args = cmd_args.chain(args).chain(extra_args.iter().copied());
+        let cmd_args = cmd_args.chain(self.flags.iter().map(String::as_str));
 
         let outdir = interp
             .os
             .tempdir()
             .context_runtime("Failed to create temporary directory")?;
 
-        let out_path = interp
-            .os
-            .join_paths(&[outdir.path(), "output"])
-            .context_runtime("Failed to create temporary output file path")?;
+        let out_path = outdir.path().join("output");
 
         let input_filename = match self.lang.as_str() {
             "c" => "input.c",
@@ -288,22 +284,17 @@ impl Compiler {
                 )));
             }
         };
-        let input = interp
-            .os
-            .join_paths(&[outdir.path(), input_filename])
-            .context_runtime("Failed to create temporary source file path")?;
+        let input = outdir.path().join(input_filename);
         interp
             .os
             .write_file(&input, code.as_bytes())
             .context_runtime("Failed to write temporary source file")?;
 
-        let command = command
-            .chain(all_args.iter().copied())
-            .chain([&input, "-o", &out_path]);
+        let cmd_args = cmd_args.chain([input.as_ref(), "-o", out_path.as_ref()]);
 
         let result = interp
             .os
-            .run_command(&command.collect::<Vec<_>>())
+            .run_command(&self.command, &cmd_args.collect::<Vec<_>>())
             .context_runtime("Failed to run compiler")?;
 
         let artifact = interp.os.read_file(&out_path).unwrap_or_default();
@@ -334,6 +325,41 @@ fn get_extra_args(kwargs: &HashMap<String, Value>) -> Result<Vec<&str>, Interpre
     }
 }
 
+fn get_compiler_argv0(interp: &mut Interpreter, lang: &str) -> Result<Path, InterpreterError> {
+    let compiler_info = interp
+        .os
+        .get_compiler(lang)
+        .with_context_runtime(|| format!("Failed to get compiler for language: {lang}"))?;
+
+    Ok(compiler_info.bin)
+}
+
+fn get_compiler_flags(
+    interp: &mut Interpreter,
+    lang: &str,
+) -> Result<Vec<String>, InterpreterError> {
+    let mut flags = Vec::new();
+
+    if let Some(f) = interp.options.get(&format!("{lang}_args")) {
+        let f = f
+            .value
+            .as_array()
+            .context_type("Expected compiler flags option to be an array")?
+            .iter()
+            .map(|v| v.as_string().map(String::from))
+            .collect::<Result<Vec<String>, _>>()
+            .context_type("Expected compiler flags option to be an array of strings")?;
+
+        flags.extend(f);
+    }
+
+    if let Some(CompilerInfo { flags: f, .. }) = interp.os.get_compiler(lang).ok() {
+        flags.extend(f);
+    }
+
+    Ok(flags)
+}
+
 pub fn get_compiler(
     args: Vec<Value>,
     _kwargs: HashMap<String, Value>,
@@ -345,13 +371,17 @@ pub fn get_compiler(
         .as_string()
         .context_type("Expected a string as the first argument")?;
 
-    let command = interp
-        .os
-        .get_compiler(lang)
-        .with_context_runtime(|| format!("Failed to get {lang} compiler"))?;
+    let command = get_compiler_argv0(interp, lang).with_context_runtime(|| {
+        format!("Failed to determine compiler command for language: {lang}")
+    })?;
+
+    let flags = get_compiler_flags(interp, lang).with_context_runtime(|| {
+        format!("Failed to determine compiler flags for language: {lang}")
+    })?;
 
     Ok(Compiler {
         command,
+        flags,
         lang: lang.into(),
     }
     .into_object())

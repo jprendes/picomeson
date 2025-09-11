@@ -1,10 +1,10 @@
 use std::env::consts::{ARCH, OS};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 use std::{env, fs};
 
 use anyhow::bail;
-use picomeson::os;
+use picomeson::os::{self, CompilerInfo};
 use tempfile::tempdir;
 
 pub struct Os;
@@ -15,7 +15,7 @@ const ENDIAN: &str = if cfg!(target_endian = "little") {
     "big"
 };
 
-pub const PREFIX: &str = if cfg!(windows) { "C:\\" } else { "/usr/local" };
+pub const PREFIX: &str = "/usr/local";
 
 impl os::Os for Os {
     fn print(&self, msg: &str) {
@@ -45,73 +45,63 @@ impl os::Os for Os {
         })
     }
 
-    fn seppath(&self) -> os::Result<String> {
-        Ok(env::join_paths(["", ""])?.to_string_lossy().into_owned())
+    fn is_file(&self, path: &os::Path) -> os::Result<bool> {
+        Ok(Path::new(path.as_ref()).is_file())
     }
-
-    fn join_paths(&self, paths: &[&str]) -> os::Result<String> {
-        let mut path = PathBuf::new();
-        for p in paths {
-            path.push(p);
-        }
-        Ok(path.to_string_lossy().into_owned())
+    fn is_dir(&self, path: &os::Path) -> os::Result<bool> {
+        Ok(Path::new(path.as_ref()).is_dir())
     }
-
-    fn is_file(&self, path: &str) -> os::Result<bool> {
-        println!("Checking if path is a file: {}", path);
-        Ok(Path::new(path).is_file())
+    fn exists(&self, path: &os::Path) -> os::Result<bool> {
+        Ok(Path::new(path.as_ref()).exists())
     }
-    fn is_dir(&self, path: &str) -> os::Result<bool> {
-        Ok(Path::new(path).is_dir())
+    fn read_file(&self, path: &os::Path) -> os::Result<Vec<u8>> {
+        Ok(fs::read(path.as_ref())?)
     }
-    fn exists(&self, path: &str) -> os::Result<bool> {
-        Ok(Path::new(path).exists())
-    }
-    fn read_file(&self, path: &str) -> os::Result<Vec<u8>> {
-        Ok(fs::read(path)?)
-    }
-    fn write_file(&self, path: &str, data: &[u8]) -> os::Result<()> {
-        Ok(fs::write(path, data)?)
+    fn write_file(&self, path: &os::Path, data: &[u8]) -> os::Result<()> {
+        Ok(fs::write(path.as_ref(), data)?)
     }
     fn tempdir(&self) -> os::Result<os::TempDir> {
         let dir = tempdir()?;
         let path = dir.path().to_string_lossy().into_owned();
+        let path = os::Path::from(path);
         Ok(os::TempDir::new(path, dir))
     }
 
-    fn get_compiler(&self, lang: &str) -> os::Result<Vec<String>> {
+    fn get_compiler(&self, lang: &str) -> os::Result<os::CompilerInfo> {
         match lang {
             "c" => {
                 let cc = env::var("CC").unwrap_or_else(|_| "cc".into());
                 let cflags = self.get_env("CFLAGS").unwrap_or_default();
                 let cflags = cflags.split_whitespace().map(String::from);
-                Ok(core::iter::once(cc).chain(cflags).collect())
+                Ok(CompilerInfo {
+                    bin: os::Path::from(cc),
+                    flags: cflags.collect(),
+                })
             }
             "cpp" => {
                 let cxx = env::var("CXX").unwrap_or_else(|_| "c++".into());
                 let cxxflags = self.get_env("CXXFLAGS").unwrap_or_default();
                 let cxxflags = cxxflags.split_whitespace().map(String::from);
-                Ok(core::iter::once(cxx).chain(cxxflags).collect())
+                Ok(CompilerInfo {
+                    bin: os::Path::from(cxx),
+                    flags: cxxflags.collect(),
+                })
             }
             _ => bail!("Unsupported language: {lang}"),
         }
     }
 
-    fn find_program(&self, name: &str, cwd: &str) -> os::Result<String> {
-        let cwd = env::current_dir()?.join(cwd);
+    fn find_program(&self, name: &os::Path, cwd: &os::Path) -> os::Result<os::Path> {
+        let cwd = env::current_dir()?.join(cwd.as_ref());
         let path = self.get_env("PATH");
 
-        let path = which::which_in(name, path, cwd)?;
+        let path = which::which_in(name.as_ref(), path, cwd)?;
 
-        Ok(path.to_string_lossy().into_owned())
+        Ok(os::Path::from(path.to_string_lossy()))
     }
 
-    fn run_command(&self, cmd: &[&str]) -> os::Result<os::RunCommandOutput> {
-        if cmd.is_empty() {
-            bail!("Command is empty");
-        }
-
-        let output = Command::new(cmd[0]).args(&cmd[1..]).output()?;
+    fn run_command(&self, cmd: &os::Path, args: &[&str]) -> os::Result<os::RunCommandOutput> {
+        let output = Command::new(cmd.as_ref()).args(args).output()?;
 
         Ok(picomeson::os::RunCommandOutput {
             stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
@@ -120,7 +110,7 @@ impl os::Os for Os {
         })
     }
 
-    fn default_prefix(&self) -> os::Result<String> {
-        Ok(PREFIX.into())
+    fn default_prefix(&self) -> os::Result<os::Path> {
+        Ok(os::Path::from(PREFIX))
     }
 }

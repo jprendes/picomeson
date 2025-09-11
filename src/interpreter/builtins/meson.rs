@@ -1,4 +1,4 @@
-use alloc::string::String;
+use alloc::string::{String, ToString as _};
 use alloc::vec::Vec;
 
 use hashbrown::HashMap;
@@ -7,11 +7,12 @@ use super::builtin_impl;
 use crate::interpreter::builtins::compiler::get_compiler;
 use crate::interpreter::builtins::version::version;
 use crate::interpreter::{Interpreter, InterpreterError, MesonObject, Value};
+use crate::os::Path;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Meson {
-    build_dir: String,
-    source_dir: String,
+    build_dir: Path,
+    source_dir: Path,
     pub project_name: String,
     pub project_version: String,
     pub project_args: HashMap<String, Vec<String>>,
@@ -83,7 +84,7 @@ impl Meson {
         _kwargs: HashMap<String, Value>,
         _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
-        Ok(Value::String(self.build_dir.clone()))
+        Ok(Value::String(self.build_dir.to_string()))
     }
 
     fn current_source_dir(
@@ -92,14 +93,14 @@ impl Meson {
         _kwargs: HashMap<String, Value>,
         _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
-        Ok(Value::String(self.source_dir.clone()))
+        Ok(Value::String(self.source_dir.to_string()))
     }
 }
 
-pub fn meson(source_dir: impl Into<String>, build_dir: impl Into<String>) -> Meson {
+pub fn meson(source_dir: Path, build_dir: Path) -> Meson {
     Meson {
-        build_dir: build_dir.into(),
-        source_dir: source_dir.into(),
+        build_dir,
+        source_dir,
         project_name: "".into(),
         project_version: "0.0.0".into(),
         project_args: HashMap::new(),

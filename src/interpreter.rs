@@ -8,7 +8,7 @@ use core::fmt;
 use as_any::Downcast;
 use hashbrown::HashMap;
 
-use crate::os::Os;
+use crate::os::{Os, Path};
 use crate::parser::{BinaryOperator, Statement, UnaryOperator, Value as AstValue};
 
 mod builtins;
@@ -34,6 +34,7 @@ use builtins::variable::{get_variable, is_variable, set_variable};
 use builtins::{array as builtin_array, dict as builtin_dict, string as builtin_string};
 
 pub mod error;
+pub mod path;
 
 pub use error::InterpreterError;
 use error::{ErrorContext as _, bail_runtime_error, bail_type_error};
@@ -71,7 +72,7 @@ impl Value {
         }
     }
 
-    fn coerce_bool(&self) -> bool {
+    fn coerce_boolean(&self) -> bool {
         match self {
             Value::Boolean(b) => *b,
             Value::Integer(i) => *i != 0,
@@ -83,7 +84,7 @@ impl Value {
         }
     }
 
-    fn as_bool(&self) -> Result<bool, InterpreterError> {
+    fn as_boolean(&self) -> Result<bool, InterpreterError> {
         match self {
             Value::Boolean(b) => Ok(*b),
             _ => bail_type_error!("Expected a boolean, found {:?}", self),
@@ -215,20 +216,17 @@ pub struct Interpreter {
     break_flag: bool,
     continue_flag: bool,
     meson: Rc<RefCell<Meson>>,
-    current_dir: String,
+    current_dir: Path,
     os: Rc<dyn Os>,
 }
 
 impl Interpreter {
     pub fn new(
         os: Rc<dyn Os>,
-        src_dir: impl Into<String>,
-        build_dir: impl Into<String>,
+        src_dir: Path,
+        build_dir: Path,
     ) -> Result<Self, InterpreterError> {
-        let src_dir = src_dir.into();
-        let build_dir = build_dir.into();
-
-        let meson = meson(&src_dir, build_dir);
+        let meson = meson(src_dir.clone(), build_dir);
         let meson = Rc::new(RefCell::new(meson));
 
         let mut interpreter = Self {
@@ -288,7 +286,7 @@ impl Interpreter {
         Ok(())
     }
 
-    pub fn interpret_file(&mut self, file_path: &str) -> Result<(), InterpreterError> {
+    pub fn interpret_file(&mut self, file_path: &Path) -> Result<(), InterpreterError> {
         let contents = self
             .os
             .read_file(file_path)
@@ -324,13 +322,13 @@ impl Interpreter {
             }
             Statement::If(condition, then_branch, elif_branches, else_branch) => {
                 let cond_value = self.evaluate_value(condition)?;
-                if cond_value.coerce_bool() {
+                if cond_value.coerce_boolean() {
                     self.execute_block(then_branch)?;
                 } else {
                     let mut executed = false;
                     for (elif_cond, elif_body) in elif_branches {
                         let elif_value = self.evaluate_value(elif_cond)?;
-                        if elif_value.coerce_bool() {
+                        if elif_value.coerce_boolean() {
                             self.execute_block(elif_body)?;
                             executed = true;
                             break;
@@ -446,7 +444,7 @@ impl Interpreter {
             }
             AstValue::TernaryOp(condition, true_val, false_val) => {
                 let cond = self.evaluate_value(*condition)?;
-                if cond.coerce_bool() {
+                if cond.coerce_boolean() {
                     self.evaluate_value(*true_val)
                 } else {
                     self.evaluate_value(*false_val)
@@ -587,11 +585,8 @@ impl Interpreter {
                     }
                     (Value::String(a), Value::String(b)) => {
                         // Path joining in Meson
-                        let joined = self
-                            .os
-                            .join_paths(&[a, b])
-                            .context_runtime("Failed to join paths")?;
-                        Ok(Value::String(joined))
+                        let joined = Path::from(a).join(b);
+                        Ok(Value::String(joined.to_string()))
                     }
                     _ => bail_type_error!("Invalid operands for division"),
                 }
@@ -628,8 +623,12 @@ impl Interpreter {
                 (Value::String(a), Value::String(b)) => Ok(Value::Boolean(a >= b)),
                 _ => bail_type_error!("Cannot compare incompatible types"),
             },
-            BinaryOperator::And => Ok(Value::Boolean(left.coerce_bool() && right.coerce_bool())),
-            BinaryOperator::Or => Ok(Value::Boolean(left.coerce_bool() || right.coerce_bool())),
+            BinaryOperator::And => Ok(Value::Boolean(
+                left.coerce_boolean() && right.coerce_boolean(),
+            )),
+            BinaryOperator::Or => Ok(Value::Boolean(
+                left.coerce_boolean() || right.coerce_boolean(),
+            )),
             BinaryOperator::In => match right {
                 Value::Array(arr) => Ok(Value::Boolean(arr.contains(&left))),
                 Value::String(s) => {
@@ -671,7 +670,7 @@ impl Interpreter {
 
     fn apply_unary_op(&self, op: UnaryOperator, value: Value) -> Result<Value, InterpreterError> {
         match op {
-            UnaryOperator::Not => Ok(Value::Boolean(!value.coerce_bool())),
+            UnaryOperator::Not => Ok(Value::Boolean(!value.coerce_boolean())),
             UnaryOperator::Minus => match value {
                 Value::Integer(i) => Ok(Value::Integer(-i)),
                 _ => bail_type_error!("Cannot negate non-integer"),

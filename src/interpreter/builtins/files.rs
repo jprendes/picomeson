@@ -6,11 +6,11 @@ use hashbrown::HashMap;
 use crate::interpreter::builtins::builtin_impl;
 use crate::interpreter::builtins::utils::{AsValueSlice, flatten};
 use crate::interpreter::{Interpreter, InterpreterError, MesonObject, Value, bail_type_error};
+use crate::os::Path;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct File {
-    pwd: String,
-    path: String,
+    path: Path,
 }
 
 impl MesonObject for File {
@@ -26,8 +26,7 @@ pub(super) fn files_impl<'a, 'b: 'a>(
         .map(|arg| {
             if let Ok(s) = arg.as_string() {
                 Ok(File {
-                    pwd: pwd.clone(),
-                    path: String::from(s),
+                    path: pwd.join(s),
                 })
             } else if let Ok(file) = arg.as_object::<File>() {
                 Ok(file.clone())

@@ -5,6 +5,8 @@ use core::any::Any;
 
 pub use anyhow::Result;
 
+pub use crate::interpreter::path::Path;
+
 #[derive(Debug, Clone)]
 pub struct MachineInfo {
     pub system: String,
@@ -26,21 +28,26 @@ pub struct RunCommandOutput {
 }
 
 pub struct TempDir {
-    path: String,
+    path: Path,
     _opaque: Box<dyn Any>,
 }
 
 impl TempDir {
-    pub fn new(path: String, opaque: impl Any) -> Self {
+    pub fn new(path: Path, opaque: impl Any) -> Self {
         Self {
             path,
             _opaque: Box::new(opaque),
         }
     }
 
-    pub fn path(&self) -> &str {
+    pub fn path(&self) -> &Path {
         &self.path
     }
+}
+
+pub struct CompilerInfo {
+    pub bin: Path,
+    pub flags: Vec<String>,
 }
 
 pub trait Os: 'static {
@@ -51,25 +58,21 @@ pub trait Os: 'static {
     fn get_env(&self, key: &str) -> Option<String>;
     fn build_machine(&self) -> Result<MachineInfo>;
     fn host_machine(&self) -> Result<MachineInfo>;
-    fn default_prefix(&self) -> Result<String>;
-
-    // path
-    fn join_paths(&self, paths: &[&str]) -> Result<String>;
+    fn default_prefix(&self) -> Result<Path>;
 
     // fs
-    fn seppath(&self) -> Result<String>;
-    fn is_file(&self, path: &str) -> Result<bool>;
-    fn is_dir(&self, path: &str) -> Result<bool>;
-    fn exists(&self, path: &str) -> Result<bool>;
-    fn read_file(&self, path: &str) -> Result<Vec<u8>>;
-    fn write_file(&self, path: &str, data: &[u8]) -> Result<()>;
+    fn is_file(&self, path: &Path) -> Result<bool>;
+    fn is_dir(&self, path: &Path) -> Result<bool>;
+    fn exists(&self, path: &Path) -> Result<bool>;
+    fn read_file(&self, path: &Path) -> Result<Vec<u8>>;
+    fn write_file(&self, path: &Path, data: &[u8]) -> Result<()>;
 
     fn tempdir(&self) -> Result<TempDir>;
 
     // compiler
-    fn get_compiler(&self, lang: &str) -> Result<Vec<String>>;
+    fn get_compiler(&self, lang: &str) -> Result<CompilerInfo>;
 
     // misc
-    fn find_program(&self, name: &str, pwd: &str) -> Result<String>;
-    fn run_command(&self, cmd: &[&str]) -> Result<RunCommandOutput>;
+    fn find_program(&self, name: &Path, pwd: &Path) -> Result<Path>;
+    fn run_command(&self, cmd: &Path, args: &[&str]) -> Result<RunCommandOutput>;
 }

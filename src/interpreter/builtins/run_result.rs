@@ -7,6 +7,7 @@ use super::builtin_impl;
 use crate::interpreter::builtins::utils::flatten;
 use crate::interpreter::error::ErrorContext;
 use crate::interpreter::{Interpreter, InterpreterError, MesonObject, Value};
+use crate::os::Path;
 
 #[derive(Debug, Clone, PartialEq)]
 struct RunResult {
@@ -53,19 +54,20 @@ pub fn run_command(
     _kwargs: HashMap<String, Value>,
     interp: &mut Interpreter,
 ) -> Result<Value, InterpreterError> {
-    let cmd_args = flatten(&args)
-        .map(Value::as_string)
-        .collect::<Result<Vec<_>, _>>()?;
+    let mut args = flatten(&args)
+        .map(Value::as_string);
 
-    if cmd_args.is_empty() {
-        return Err(InterpreterError::RuntimeError(
-            "Expected at least one argument".into(),
-        ));
-    }
+    let cmd = args.next()
+        .context_type("Expected at least one argument")?
+        .context_type("Expected command to be a string")?;
+    let cmd = Path::from(cmd);
+
+    let arguments = args.collect::<Result<Vec<_>, _>>()
+        .context_type("Expected command arguments to be strings")?;
 
     let output = interp
         .os
-        .run_command(&cmd_args)
+        .run_command(&cmd, &arguments)
         .context_runtime("Failed to run command")?;
 
     Ok(RunResult {

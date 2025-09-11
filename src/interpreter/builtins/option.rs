@@ -71,7 +71,7 @@ pub fn option(
     let value = kwargs.get("value");
     let (value, typ) = match typ {
         "boolean" => {
-            let bool_value = value.map(Value::as_bool).transpose()?.unwrap_or(true);
+            let bool_value = value.map(Value::as_boolean).transpose()?.unwrap_or(true);
             (Value::Boolean(bool_value), OptionType::Boolean)
         }
         "integer" => {

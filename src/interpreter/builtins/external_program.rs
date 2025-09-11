@@ -1,5 +1,5 @@
 use alloc::format;
-use alloc::string::String;
+use alloc::string::{String, ToString as _};
 use alloc::vec::Vec;
 
 use hashbrown::HashMap;
@@ -7,10 +7,11 @@ use hashbrown::HashMap;
 use super::builtin_impl;
 use crate::interpreter::error::ErrorContext;
 use crate::interpreter::{Interpreter, InterpreterError, MesonObject, Value};
+use crate::os::Path;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExternalProgram {
-    full_path: Option<String>,
+    full_path: Option<Path>,
 }
 
 impl ExternalProgram {
@@ -32,7 +33,7 @@ impl ExternalProgram {
         let Some(path) = &self.full_path else {
             return Ok(Value::None);
         };
-        Ok(Value::String(path.clone()))
+        Ok(Value::String(path.to_string()))
     }
 }
 
@@ -51,8 +52,10 @@ pub fn find_program(
         .as_string()
         .context_type("Expected a string as the first argument")?;
 
+    let prog = Path::from(prog);
+
     // Simple check if program exists in PATH
-    let full_path = interp.os.find_program(prog, &interp.current_dir).ok();
+    let full_path = interp.os.find_program(&prog, &interp.current_dir).ok();
 
     let found = full_path.is_some();
 
@@ -64,7 +67,7 @@ pub fn find_program(
 
     let required = kwargs
         .get("required")
-        .map(Value::as_bool)
+        .map(Value::as_boolean)
         .transpose()?
         .unwrap_or(false);
 

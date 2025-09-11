@@ -14,7 +14,7 @@ pub fn assert(
     let cond = args
         .first()
         .context_type("assert requires at least one argument")?
-        .as_bool()
+        .as_boolean()
         .context_type("First argument to assert must be a boolean")?;
 
     let msg = args

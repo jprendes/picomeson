@@ -17,12 +17,14 @@ impl MesonObject for Env {
     builtin_impl!(prepend);
 }
 
+const DEFAULT_SEPARATOR: &str = ":";
+
 impl Env {
     fn prepend(
         &mut self,
         args: Vec<Value>,
         kwargs: HashMap<String, Value>,
-        interp: &mut Interpreter,
+        _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         let variable = args
             .first()
@@ -32,17 +34,12 @@ impl Env {
 
         let new_values = flatten(&args[1..]).map(|v| v.as_string());
 
-        let default_separator = interp
-            .os
-            .seppath()
-            .context_runtime("Failed to get system path separator")?;
-
         let separator = kwargs
             .get("separator")
             .map(Value::as_string)
             .transpose()
             .context_type("Expected 'separator' keyword argument to be a string")?
-            .unwrap_or(default_separator.as_str());
+            .unwrap_or(DEFAULT_SEPARATOR);
 
         let old_value = self.vars.get(variable).map(|s| Ok(s.as_str()));
         let values = new_values.chain(old_value).collect::<Result<Vec<_>, _>>()?;

@@ -1,4 +1,4 @@
-use alloc::string::String;
+use alloc::string::{String, ToString as _};
 use alloc::vec::Vec;
 
 use hashbrown::HashMap;
@@ -6,6 +6,7 @@ use hashbrown::HashMap;
 use super::builtin_impl;
 use crate::interpreter::error::ErrorContext;
 use crate::interpreter::{Interpreter, InterpreterError, MesonObject, Value};
+use crate::os::Path;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FileSystem;
@@ -26,10 +27,8 @@ impl FileSystem {
             .context_type("Expected a string argument")?
             .as_string()
             .context_type("Expected a string argument")?;
-        let path = interp
-            .os
-            .join_paths(&[&interp.current_dir, path])
-            .context_runtime("Failed to join paths")?;
+
+        let path = interp.current_dir.join(path);
 
         let is_file = interp
             .os
@@ -49,10 +48,8 @@ impl FileSystem {
             .context_type("Expected a string argument")?
             .as_string()
             .context_type("Expected a string argument")?;
-        let path = interp
-            .os
-            .join_paths(&[&interp.current_dir, path])
-            .context_runtime("Failed to join paths")?;
+
+        let path = interp.current_dir.join(path);
 
         let is_dir = interp
             .os
@@ -72,10 +69,8 @@ impl FileSystem {
             .context_type("Expected a string argument")?
             .as_string()
             .context_type("Expected a string argument")?;
-        let path = interp
-            .os
-            .join_paths(&[&interp.current_dir, path])
-            .context_runtime("Failed to join paths")?;
+
+        let path = interp.current_dir.join(path);
 
         let exists = interp
             .os
@@ -90,53 +85,21 @@ impl FileSystem {
         _kwargs: HashMap<String, Value>,
         _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
-        let Some(Value::String(path)) = args.first() else {
-            return Err(InterpreterError::TypeError(
-                "Expected a string argument".into(),
-            ));
-        };
-        let Some(Value::String(suffix)) = args.get(1) else {
-            return Err(InterpreterError::TypeError(
-                "Expected a string argument".into(),
-            ));
-        };
+        let path = args.first().map(Value::as_string)
+            .context_type("First argument to replace_suffix must be a string")?
+            .context_type("First argument to replace_suffix must be a string")?;
+
+        let suffix = args.get(1).map(Value::as_string)
+            .context_type("Second argument to replace_suffix must be a string")?
+            .context_type("Second argument to replace_suffix must be a string")?;
 
         // replace the extension of the path in `path` with `suffix` without using `PathBuf`.
 
-        let path = set_extension(path, suffix);
-        Ok(Value::String(path))
+        let path = Path::from(path).set_extension(suffix);
+        Ok(Value::String(path.to_string()))
     }
 }
 
 pub fn filesystem() -> FileSystem {
     FileSystem
-}
-
-fn set_extension(path: &str, suffix: &str) -> String {
-    // replace the extension of the path in `path` with `suffix` without using `PathBuf`.
-
-    // Find the last occurrence of '/' or '\'
-    let last_separator = path.rfind(['/', '\\']);
-
-    // Find the last occurrence of '.' after the last separator (or from start if no separator)
-    let search_start = last_separator.map(|i| i + 1).unwrap_or(0);
-    let last_dot = path[search_start..].rfind('.').map(|i| search_start + i);
-
-    if let Some(dot_pos) = last_dot {
-        // Replace everything after the last dot with the new suffix
-        let mut new_path = String::from(&path[..dot_pos]);
-        if !suffix.starts_with('.') {
-            new_path.push('.');
-        }
-        new_path.push_str(suffix);
-        new_path
-    } else {
-        // No extension found, append the suffix
-        let mut new_path = String::from(path);
-        if !suffix.starts_with('.') {
-            new_path.push('.');
-        }
-        new_path.push_str(suffix);
-        new_path
-    }
 }

@@ -1,16 +1,18 @@
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 
 extern crate alloc;
 
 mod interpreter;
+mod machine_file;
 pub mod os;
 mod parser;
 
-use alloc::format;
 use alloc::rc::Rc;
 use alloc::string::String;
 
 use hashbrown::HashMap;
+
+use crate::os::Path;
 
 pub struct Meson {
     os: Rc<dyn os::Os>,
@@ -31,27 +33,23 @@ impl Meson {
 
     pub fn build(
         &self,
-        src_dir: impl Into<String>,
-        build_dir: impl Into<String>,
+        src_dir: impl AsRef<str>,
+        build_dir: impl AsRef<str>,
     ) -> anyhow::Result<()> {
-        let src_dir = src_dir.into();
-        let build_dir = build_dir.into();
+        let src_dir = Path::from(src_dir.as_ref());
+        let build_dir = Path::from(build_dir.as_ref());
 
-        let mut interp = interpreter::Interpreter::new(self.os.clone(), &src_dir, &build_dir)?;
+        let mut interp =
+            interpreter::Interpreter::new(self.os.clone(), src_dir.clone(), build_dir)?;
 
         interp.interpret_string(include_str!("builtin-options.txt"))?;
 
+        // prefix is a platform dependent option, so set it at runtime
         let default_prefix = self.os.default_prefix()?;
-        interp.set_option("prefix", &default_prefix)?;
+        interp.set_option("prefix", default_prefix.as_ref())?;
 
-        let meson_options_path = self
-            .os
-            .join_paths(&[src_dir.as_str(), "meson_options.txt"])?;
-        self.os
-            .print(&format!("Looking for options file at {meson_options_path}"));
+        let meson_options_path = src_dir.join("meson_options.txt");
         if self.os.exists(&meson_options_path).unwrap_or(false) {
-            self.os
-                .print(&format!("Found options file at {meson_options_path}"));
             interp.interpret_file(&meson_options_path)?;
         }
 
@@ -59,7 +57,7 @@ impl Meson {
             interp.set_option(name, value)?;
         }
 
-        let meson_build_path = self.os.join_paths(&[src_dir.as_str(), "meson.build"])?;
+        let meson_build_path = src_dir.join("meson.build");
         interp.interpret_file(&meson_build_path)?;
 
         Ok(())
