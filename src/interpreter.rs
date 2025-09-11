@@ -743,7 +743,10 @@ impl Interpreter {
 
     pub fn set_option(&mut self, name: &str, value: &str) -> Result<(), InterpreterError> {
         let Some(option) = self.options.get_mut(name) else {
-            bail_runtime_error!("Option '{name}' is not defined");
+            bail_runtime_error!(
+                "Option '{name}' is not defined. Available options: {:?}",
+                self.options.keys().collect::<Vec<_>>()
+            );
         };
 
         match option.typ {

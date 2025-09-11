@@ -8,3 +8,4 @@ picomeson.workspace = true
 tempfile = "3.22.0"
 which = "8.0.0"
 anyhow.workspace = true
+clap = { version = "4", features = ["derive"] }

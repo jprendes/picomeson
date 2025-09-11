@@ -7,7 +7,7 @@ use anyhow::bail;
 use picomeson::os;
 use tempfile::tempdir;
 
-pub struct OsEnv;
+pub struct Os;
 
 const ENDIAN: &str = if cfg!(target_endian = "little") {
     "little"
@@ -15,7 +15,9 @@ const ENDIAN: &str = if cfg!(target_endian = "little") {
     "big"
 };
 
-impl os::Os for OsEnv {
+pub const PREFIX: &str = if cfg!(windows) { "C:\\" } else { "/usr/local" };
+
+impl os::Os for Os {
     fn print(&self, msg: &str) {
         println!("{}", msg);
     }
@@ -119,10 +121,6 @@ impl os::Os for OsEnv {
     }
 
     fn default_prefix(&self) -> os::Result<String> {
-        if cfg!(windows) {
-            Ok("C:\\".into())
-        } else {
-            Ok("/usr/local".into())
-        }
+        Ok(PREFIX.into())
     }
 }
