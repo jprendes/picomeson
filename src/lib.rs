@@ -44,10 +44,6 @@ impl Meson {
 
         interp.interpret_string(include_str!("builtin-options.txt"))?;
 
-        // prefix is a platform dependent option, so set it at runtime
-        let default_prefix = self.os.default_prefix()?;
-        interp.set_option("prefix", default_prefix.as_ref())?;
-
         let meson_options_path = src_dir.join("meson_options.txt");
         if self.os.exists(&meson_options_path).unwrap_or(false) {
             interp.interpret_file(&meson_options_path)?;

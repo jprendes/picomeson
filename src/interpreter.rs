@@ -13,6 +13,7 @@ use crate::parser::{BinaryOperator, Statement, UnaryOperator, Value as AstValue}
 
 mod builtins;
 
+use builtins::add_languages::add_languages;
 use builtins::build_target::{custom_target, executable, static_library};
 use builtins::config_data::{configuration_data, configure_file};
 use builtins::debug::{assert, error as error_fn, message, warning};
@@ -30,6 +31,7 @@ use builtins::option::{BuildOption, OptionType, get_option, option};
 use builtins::project::{add_project_arguments, project};
 use builtins::run_result::run_command;
 use builtins::subdir::subdir;
+use builtins::test::test;
 use builtins::variable::{get_variable, is_variable, set_variable};
 use builtins::{array as builtin_array, dict as builtin_dict, string as builtin_string};
 
@@ -221,11 +223,7 @@ pub struct Interpreter {
 }
 
 impl Interpreter {
-    pub fn new(
-        os: Rc<dyn Os>,
-        src_dir: Path,
-        build_dir: Path,
-    ) -> Result<Self, InterpreterError> {
+    pub fn new(os: Rc<dyn Os>, src_dir: Path, build_dir: Path) -> Result<Self, InterpreterError> {
         let meson = meson(src_dir.clone(), build_dir);
         let meson = Rc::new(RefCell::new(meson));
 
@@ -484,6 +482,7 @@ impl Interpreter {
             "get_variable" => get_variable(eval_args, eval_kwargs, self),
             "include_directories" => include_directories(eval_args, eval_kwargs, self),
             "add_project_arguments" => add_project_arguments(eval_args, eval_kwargs, self),
+            "add_languages" => add_languages(eval_args, eval_kwargs, self),
             "files" => files(eval_args, eval_kwargs, self),
             "subdir" => subdir(eval_args, eval_kwargs, self),
             "environment" => environment(eval_args, eval_kwargs, self),
@@ -491,6 +490,7 @@ impl Interpreter {
             "static_library" => static_library(eval_args, eval_kwargs, self),
             "executable" => executable(eval_args, eval_kwargs, self),
             "custom_target" => custom_target(eval_args, eval_kwargs, self),
+            "test" => test(eval_args, eval_kwargs, self),
             "find_program" => find_program(eval_args, eval_kwargs, self),
             "install_headers" => install_headers(eval_args, eval_kwargs, self),
             "assert" => assert(eval_args, eval_kwargs, self),
@@ -769,7 +769,7 @@ impl Interpreter {
                         "Invalid value '{value}' for string option '{name}', allowed values are: {choices:?}"
                     );
                 }
-                option.value = Value::String(choices.first().cloned().unwrap_or_default());
+                option.value = Value::String(value);
             }
             OptionType::Array(ref choices) => {
                 // TODO: check the actual behavior of this

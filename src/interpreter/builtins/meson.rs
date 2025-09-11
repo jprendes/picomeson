@@ -11,8 +11,8 @@ use crate::os::Path;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Meson {
-    build_dir: Path,
-    source_dir: Path,
+    pub build_dir: Path,
+    pub source_dir: Path,
     pub project_name: String,
     pub project_version: String,
     pub project_args: HashMap<String, Vec<String>>,

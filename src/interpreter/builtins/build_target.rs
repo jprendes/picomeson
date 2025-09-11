@@ -1,5 +1,5 @@
 use alloc::format;
-use alloc::string::String;
+use alloc::string::{String, ToString as _};
 use alloc::vec::Vec;
 
 use hashbrown::HashMap;
@@ -41,10 +41,25 @@ impl BuildTarget {
         // Placeholder implementation
         Ok(Value::None)
     }
+
+    fn full_path(
+        &self,
+        _args: Vec<Value>,
+        _kwargs: HashMap<String, Value>,
+        interp: &mut Interpreter,
+    ) -> Result<Value, InterpreterError> {
+        let name = match self.target_type {
+            TargetType::StaticLibrary => format!("lib{}.a", self.name),
+            TargetType::Executable => self.name.clone(),
+        };
+        let path = interp.meson.borrow().build_dir.join(name);
+        // Placeholder implementation
+        Ok(Value::String(path.to_string()))
+    }
 }
 
 impl MesonObject for BuildTarget {
-    builtin_impl!(extract_objects, extract_all_objects);
+    builtin_impl!(extract_objects, extract_all_objects, full_path);
 }
 
 pub fn static_library(

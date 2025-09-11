@@ -22,6 +22,8 @@ pub mod subdir;
 pub mod utils;
 pub mod variable;
 pub mod version;
+pub mod add_languages;
+pub mod test;
 
 macro_rules! builtin_impl {
     ($($method:ident),* $(,)?) => {

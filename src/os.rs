@@ -108,12 +108,6 @@ pub trait Os: 'static {
     /// Machine information including system, CPU, and endianness
     fn host_machine(&self) -> Result<MachineInfo>;
     
-    /// Gets the default installation prefix for the current platform
-    ///
-    /// # Returns
-    /// The default prefix path (e.g., "/usr/local" on Unix-like systems)
-    fn default_prefix(&self) -> Result<Path>;
-    
     /// Checks if a path points to a regular file
     ///
     /// # Arguments
