@@ -81,7 +81,7 @@ pub trait Os: 'static {
     /// # Arguments
     /// * `msg` - The message to print
     fn print(&self, msg: &str);
-    
+
     /// Gets the value of an environment variable
     ///
     /// # Arguments
@@ -90,7 +90,7 @@ pub trait Os: 'static {
     /// # Returns
     /// The value of the environment variable if it exists
     fn get_env(&self, key: &str) -> Option<String>;
-    
+
     /// Gets information about the build machine
     ///
     /// The build machine is the system where the build is being performed.
@@ -98,7 +98,7 @@ pub trait Os: 'static {
     /// # Returns
     /// Machine information including system, CPU, and endianness
     fn build_machine(&self) -> Result<MachineInfo>;
-    
+
     /// Gets information about the host machine
     ///
     /// The host machine is the system where the built binaries will run.
@@ -107,7 +107,7 @@ pub trait Os: 'static {
     /// # Returns
     /// Machine information including system, CPU, and endianness
     fn host_machine(&self) -> Result<MachineInfo>;
-    
+
     /// Checks if a path points to a regular file
     ///
     /// # Arguments
@@ -116,7 +116,7 @@ pub trait Os: 'static {
     /// # Returns
     /// `true` if the path is a file, `false` otherwise
     fn is_file(&self, path: &Path) -> Result<bool>;
-    
+
     /// Checks if a path points to a directory
     ///
     /// # Arguments
@@ -125,7 +125,7 @@ pub trait Os: 'static {
     /// # Returns
     /// `true` if the path is a directory, `false` otherwise
     fn is_dir(&self, path: &Path) -> Result<bool>;
-    
+
     /// Checks if a path exists
     ///
     /// # Arguments
@@ -134,7 +134,7 @@ pub trait Os: 'static {
     /// # Returns
     /// `true` if the path exists, `false` otherwise
     fn exists(&self, path: &Path) -> Result<bool>;
-    
+
     /// Reads the contents of a file
     ///
     /// # Arguments
@@ -143,7 +143,7 @@ pub trait Os: 'static {
     /// # Returns
     /// The contents of the file as a byte vector
     fn read_file(&self, path: &Path) -> Result<Vec<u8>>;
-    
+
     /// Writes data to a file
     ///
     /// Creates the file if it doesn't exist, overwrites if it does.
@@ -161,7 +161,7 @@ pub trait Os: 'static {
     /// # Returns
     /// A handle to the temporary directory
     fn tempdir(&self) -> Result<TempDir>;
-    
+
     /// Gets compiler information for a specific language
     ///
     /// # Arguments
@@ -170,7 +170,7 @@ pub trait Os: 'static {
     /// # Returns
     /// Information about the compiler including its path and default flags
     fn get_compiler(&self, lang: &str) -> Result<CompilerInfo>;
-    
+
     /// Finds a program in the system PATH or at a specific location
     ///
     /// # Arguments
@@ -180,7 +180,7 @@ pub trait Os: 'static {
     /// # Returns
     /// The absolute path to the program if found
     fn find_program(&self, name: &Path, pwd: &Path) -> Result<Path>;
-    
+
     /// Runs a command and captures its output
     ///
     /// # Arguments

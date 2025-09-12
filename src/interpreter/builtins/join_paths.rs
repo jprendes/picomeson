@@ -19,7 +19,7 @@ pub fn join_paths(
         .context_type("All arguments to join_paths must be strings")?;
 
     let mut parts = parts.into_iter();
-    
+
     let Some(path) = parts.next() else {
         return Ok(Value::String(String::new()));
     };

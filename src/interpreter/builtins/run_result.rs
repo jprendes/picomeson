@@ -54,15 +54,16 @@ pub fn run_command(
     _kwargs: HashMap<String, Value>,
     interp: &mut Interpreter,
 ) -> Result<Value, InterpreterError> {
-    let mut args = flatten(&args)
-        .map(Value::as_string);
+    let mut args = flatten(&args).map(Value::as_string);
 
-    let cmd = args.next()
+    let cmd = args
+        .next()
         .context_type("Expected at least one argument")?
         .context_type("Expected command to be a string")?;
     let cmd = Path::from(cmd);
 
-    let arguments = args.collect::<Result<Vec<_>, _>>()
+    let arguments = args
+        .collect::<Result<Vec<_>, _>>()
         .context_type("Expected command arguments to be strings")?;
 
     let output = interp

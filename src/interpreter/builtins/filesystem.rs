@@ -85,11 +85,15 @@ impl FileSystem {
         _kwargs: HashMap<String, Value>,
         _interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
-        let path = args.first().map(Value::as_string)
+        let path = args
+            .first()
+            .map(Value::as_string)
             .context_type("First argument to replace_suffix must be a string")?
             .context_type("First argument to replace_suffix must be a string")?;
 
-        let suffix = args.get(1).map(Value::as_string)
+        let suffix = args
+            .get(1)
+            .map(Value::as_string)
             .context_type("Second argument to replace_suffix must be a string")?
             .context_type("Second argument to replace_suffix must be a string")?;
 

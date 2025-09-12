@@ -1,3 +1,4 @@
+pub mod add_languages;
 pub mod array;
 pub mod build_target;
 pub mod compiler;
@@ -19,11 +20,10 @@ pub mod project;
 pub mod run_result;
 pub mod string;
 pub mod subdir;
+pub mod test;
 pub mod utils;
 pub mod variable;
 pub mod version;
-pub mod add_languages;
-pub mod test;
 
 macro_rules! builtin_impl {
     ($($method:ident),* $(,)?) => {

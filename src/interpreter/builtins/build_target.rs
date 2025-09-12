@@ -1,7 +1,6 @@
-use alloc::format;
 use alloc::string::{String, ToString as _};
 use alloc::vec::Vec;
-use alloc::vec;
+use alloc::{format, vec};
 
 use hashbrown::HashMap;
 

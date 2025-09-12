@@ -69,12 +69,10 @@ impl os::Os for Os {
 
     fn get_compiler(&self, lang: &str) -> os::Result<os::CompilerInfo> {
         match lang {
-            "c" => {
-                Ok(CompilerInfo {
-                    bin: os::Path::from("cc"),
-                    flags: vec![],
-                })
-            }
+            "c" => Ok(CompilerInfo {
+                bin: os::Path::from("cc"),
+                flags: vec![],
+            }),
             _ => bail!("Unsupported language: {lang}"),
         }
     }
