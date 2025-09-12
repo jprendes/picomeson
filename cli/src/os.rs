@@ -15,8 +15,6 @@ const ENDIAN: &str = if cfg!(target_endian = "little") {
     "big"
 };
 
-pub const PREFIX: &str = "/usr/local";
-
 impl os::Os for Os {
     fn print(&self, msg: &str) {
         println!("{}", msg);

@@ -4,7 +4,7 @@ use std::path::PathBuf;
 mod os;
 
 use clap::{Parser, ValueEnum};
-use os::{Os, PREFIX};
+use os::Os;
 
 #[derive(ValueEnum, Clone, Debug)]
 enum BuildType {
@@ -55,7 +55,7 @@ struct Args {
     buildtype: BuildType,
 
     /// Installation prefix directory
-    #[arg(long, value_name = "dir", default_value = PREFIX)]
+    #[arg(long, value_name = "dir", default_value = "/usr/local")]
     prefix: PathBuf,
 
     /// Include directory (relative to prefix)
