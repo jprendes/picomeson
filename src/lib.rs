@@ -7,6 +7,7 @@ mod machine_file;
 pub mod os;
 mod parser;
 pub mod path;
+pub mod steps;
 
 use alloc::rc::Rc;
 use alloc::string::String;
@@ -17,14 +18,16 @@ use crate::path::Path;
 
 pub struct Meson {
     os: Rc<dyn os::Os>,
+    steps: Rc<dyn steps::BuildSteps>,
     options: HashMap<String, String>,
 }
 
 impl Meson {
-    pub fn with_os(os: impl os::Os) -> Self {
+    pub fn new(os: impl os::Os, steps: impl steps::BuildSteps) -> Self {
         let os = Rc::new(os);
+        let steps = Rc::new(steps);
         let options = Default::default();
-        Self { os, options }
+        Self { os, steps, options }
     }
 
     pub fn option(&mut self, name: impl Into<String>, value: impl Into<String>) -> &mut Self {
@@ -40,8 +43,12 @@ impl Meson {
         let src_dir = Path::from(src_dir.as_ref());
         let build_dir = Path::from(build_dir.as_ref());
 
-        let mut interp =
-            interpreter::Interpreter::new(self.os.clone(), src_dir.clone(), build_dir)?;
+        let mut interp = interpreter::Interpreter::new(
+            self.os.clone(),
+            self.steps.clone(),
+            src_dir.clone(),
+            build_dir,
+        )?;
 
         interp.interpret_string(include_str!("builtin-options.txt"))?;
 

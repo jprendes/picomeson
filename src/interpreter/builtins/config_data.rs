@@ -9,6 +9,7 @@ use crate::interpreter::error::ErrorContext as _;
 use crate::interpreter::{
     Interpreter, InterpreterError, MesonObject, Value, bail_runtime_error, bail_type_error,
 };
+use crate::path::Path;
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ConfigData {
@@ -172,11 +173,7 @@ pub fn configure_file(
         content.push('\n');
     }
 
-    // TODO: Actualy output this file, and handle paths correctly
-    interp
-        .os
-        .print(&format!("Should be writing output file: {}", output));
-    interp.os.print(&format!("With content:\n{}", content));
+    interp.steps.write_file(&Path::from(output), &content);
 
     Ok(Value::None)
 }

@@ -11,8 +11,9 @@ use hashbrown::HashMap;
 use crate::os::Os;
 use crate::parser::{BinaryOperator, Statement, UnaryOperator, Value as AstValue};
 use crate::path::Path;
+use crate::steps::BuildSteps;
 
-mod builtins;
+pub(crate) mod builtins;
 
 use builtins::add_languages::add_languages;
 use builtins::build_target::{custom_target, executable, static_library};
@@ -220,10 +221,16 @@ pub struct Interpreter {
     meson: Rc<RefCell<Meson>>,
     current_dir: Path,
     os: Rc<dyn Os>,
+    steps: Rc<dyn BuildSteps>,
 }
 
 impl Interpreter {
-    pub fn new(os: Rc<dyn Os>, src_dir: Path, build_dir: Path) -> Result<Self, InterpreterError> {
+    pub fn new(
+        os: Rc<dyn Os>,
+        steps: Rc<dyn BuildSteps>,
+        src_dir: Path,
+        build_dir: Path,
+    ) -> Result<Self, InterpreterError> {
         let meson = meson(src_dir.clone(), build_dir);
         let meson = Rc::new(RefCell::new(meson));
 
@@ -235,6 +242,7 @@ impl Interpreter {
             meson,
             current_dir: src_dir,
             os,
+            steps,
         };
 
         // Initialize built-in variables

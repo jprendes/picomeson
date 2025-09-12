@@ -2,9 +2,11 @@ use std::fmt::Display;
 use std::path::PathBuf;
 
 mod os;
+mod steps;
 
 use clap::{Parser, ValueEnum};
 use os::Os;
+use steps::Steps;
 
 #[derive(ValueEnum, Clone, Debug)]
 enum BuildType {
@@ -81,7 +83,7 @@ struct Args {
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
-    let mut builder = picomeson::Meson::with_os(Os);
+    let mut builder = picomeson::Meson::new(Os, Steps);
 
     // Add buildtype option
     builder.option("buildtype", args.buildtype.to_string());

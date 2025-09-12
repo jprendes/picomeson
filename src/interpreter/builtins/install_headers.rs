@@ -1,4 +1,3 @@
-use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
@@ -7,6 +6,7 @@ use hashbrown::HashMap;
 use crate::interpreter::builtins::files::files_impl;
 use crate::interpreter::error::ErrorContext;
 use crate::interpreter::{Interpreter, InterpreterError, Value};
+use crate::path::Path;
 
 pub fn install_headers(
     args: Vec<Value>,
@@ -25,10 +25,9 @@ pub fn install_headers(
         .context_type("'install_dir' keyword argument must be of type string")?
         .unwrap_or("");
 
-    // TODO: do something with this
-    interp.os.print(&format!(
-        "Installing headers at {install_dir:?}:\n{headers:?}\n"
-    ));
+    interp
+        .steps
+        .install_headers(&Path::from(install_dir), &headers);
 
     Ok(Value::None)
 }

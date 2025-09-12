@@ -20,13 +20,13 @@ enum TargetType {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct BuildTarget {
-    name: String,
-    filename: Path,
-    sources: Vec<Path>,
-    install: bool,
-    include_dirs: Vec<Path>,
-    install_dir: Path,
-    flags: Vec<String>,
+    pub name: String,
+    pub filename: Path,
+    pub sources: Vec<Path>,
+    pub install: bool,
+    pub include_dirs: Vec<Path>,
+    pub install_dir: Path,
+    pub flags: Vec<String>,
 }
 
 impl BuildTarget {
@@ -214,9 +214,10 @@ fn add_target_impl(
         flags,
     };
 
-    interp
-        .os
-        .print(&format!("Created {target_type:?}: {:?}", lib));
+    match target_type {
+        TargetType::StaticLibrary => interp.steps.build_static_library(&lib),
+        TargetType::Executable => interp.steps.build_executable(&lib),
+    };
 
     Ok(lib.into_object())
 }
