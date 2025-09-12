@@ -30,7 +30,7 @@ impl Path {
     }
 
     pub fn from(path: impl AsRef<str>) -> Self {
-        Self(path.as_ref().replace("\\", "/").into())
+        Self(path.as_ref().replace("\\", "/"))
     }
 
     pub fn set_extension(&self, suffix: &str) -> Self {

@@ -353,7 +353,7 @@ fn get_compiler_flags(
         flags.extend(f);
     }
 
-    if let Some(CompilerInfo { flags: f, .. }) = interp.os.get_compiler(lang).ok() {
+    if let Ok(CompilerInfo { flags: f, .. }) = interp.os.get_compiler(lang) {
         flags.extend(f);
     }
 
