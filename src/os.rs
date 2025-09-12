@@ -5,7 +5,7 @@ use core::any::Any;
 
 pub use anyhow::Result;
 
-pub use crate::interpreter::path::Path;
+use crate::path::Path;
 
 /// Information about a machine's architecture and system
 #[derive(Debug, Clone)]

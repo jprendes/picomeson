@@ -6,13 +6,14 @@ mod interpreter;
 mod machine_file;
 pub mod os;
 mod parser;
+pub mod path;
 
 use alloc::rc::Rc;
 use alloc::string::String;
 
 use hashbrown::HashMap;
 
-use crate::os::Path;
+use crate::path::Path;
 
 pub struct Meson {
     os: Rc<dyn os::Os>,

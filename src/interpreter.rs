@@ -8,8 +8,9 @@ use core::fmt;
 use as_any::Downcast;
 use hashbrown::HashMap;
 
-use crate::os::{Os, Path};
+use crate::os::Os;
 use crate::parser::{BinaryOperator, Statement, UnaryOperator, Value as AstValue};
+use crate::path::Path;
 
 mod builtins;
 
@@ -36,7 +37,6 @@ use builtins::variable::{get_variable, is_variable, set_variable};
 use builtins::{array as builtin_array, dict as builtin_dict, string as builtin_string};
 
 pub mod error;
-pub mod path;
 
 pub use error::InterpreterError;
 use error::{ErrorContext as _, bail_runtime_error, bail_type_error};

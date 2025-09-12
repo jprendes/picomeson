@@ -10,7 +10,7 @@ use crate::interpreter::builtins::include_directories::IncludeDirectories;
 use crate::interpreter::builtins::utils::flatten;
 use crate::interpreter::error::ErrorContext;
 use crate::interpreter::{Interpreter, InterpreterError, MesonObject, Value};
-use crate::os::Path;
+use crate::path::Path;
 
 #[derive(Debug, Clone, PartialEq, Copy)]
 enum TargetType {
@@ -21,7 +21,7 @@ enum TargetType {
 #[derive(Debug, Clone, PartialEq)]
 pub struct BuildTarget {
     name: String,
-    target_type: TargetType,
+    filename: Path,
     sources: Vec<Path>,
     install: bool,
     include_dirs: Vec<Path>,
@@ -58,11 +58,7 @@ impl BuildTarget {
         _kwargs: HashMap<String, Value>,
         interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
-        let name = match self.target_type {
-            TargetType::StaticLibrary => format!("lib{}.a", self.name),
-            TargetType::Executable => self.name.clone(),
-        };
-        let path = interp.meson.borrow().build_dir.join(name);
+        let path = interp.meson.borrow().build_dir.join(&self.filename);
         // Placeholder implementation
         Ok(Value::String(path.to_string()))
     }
@@ -202,9 +198,15 @@ fn add_target_impl(
     let mut sources = sources;
     sources.extend(objects);
 
+    let filename = match target_type {
+        TargetType::StaticLibrary => format!("lib{name}.a"),
+        TargetType::Executable => name.clone(),
+    };
+    let filename = Path::from(filename);
+
     let lib = BuildTarget {
         name: name.clone(),
-        target_type,
+        filename,
         sources,
         install,
         include_dirs,

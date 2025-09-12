@@ -7,7 +7,7 @@ use hashbrown::HashMap;
 use crate::interpreter::builtins::builtin_impl;
 use crate::interpreter::builtins::utils::{AsValueSlice, flatten};
 use crate::interpreter::{Interpreter, InterpreterError, MesonObject, Value, bail_type_error};
-use crate::os::Path;
+use crate::path::Path;
 
 #[derive(Clone, PartialEq)]
 pub struct File {

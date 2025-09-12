@@ -7,7 +7,7 @@ use super::builtin_impl;
 use crate::interpreter::builtins::compiler::get_compiler;
 use crate::interpreter::builtins::version::version;
 use crate::interpreter::{Interpreter, InterpreterError, MesonObject, Value};
-use crate::os::Path;
+use crate::path::Path;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Meson {

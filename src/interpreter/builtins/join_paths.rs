@@ -6,7 +6,7 @@ use hashbrown::HashMap;
 use crate::interpreter::builtins::utils::flatten;
 use crate::interpreter::error::ErrorContext as _;
 use crate::interpreter::{Interpreter, InterpreterError, Value};
-use crate::os::Path;
+use crate::path::Path;
 
 pub fn join_paths(
     args: Vec<Value>,

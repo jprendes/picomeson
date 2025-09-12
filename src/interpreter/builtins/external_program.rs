@@ -7,7 +7,7 @@ use hashbrown::HashMap;
 use super::builtin_impl;
 use crate::interpreter::error::ErrorContext;
 use crate::interpreter::{Interpreter, InterpreterError, MesonObject, Value};
-use crate::os::Path;
+use crate::path::Path;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExternalProgram {

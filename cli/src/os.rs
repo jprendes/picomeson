@@ -5,6 +5,7 @@ use std::{env, fs};
 
 use anyhow::bail;
 use picomeson::os::{self, CompilerInfo};
+use picomeson::path::Path as OsPath;
 use tempfile::tempdir;
 
 pub struct Os;
@@ -43,43 +44,43 @@ impl os::Os for Os {
         })
     }
 
-    fn is_file(&self, path: &os::Path) -> os::Result<bool> {
+    fn is_file(&self, path: &OsPath) -> os::Result<bool> {
         Ok(Path::new(path.as_ref()).is_file())
     }
-    fn is_dir(&self, path: &os::Path) -> os::Result<bool> {
+    fn is_dir(&self, path: &OsPath) -> os::Result<bool> {
         Ok(Path::new(path.as_ref()).is_dir())
     }
-    fn exists(&self, path: &os::Path) -> os::Result<bool> {
+    fn exists(&self, path: &OsPath) -> os::Result<bool> {
         Ok(Path::new(path.as_ref()).exists())
     }
-    fn read_file(&self, path: &os::Path) -> os::Result<Vec<u8>> {
+    fn read_file(&self, path: &OsPath) -> os::Result<Vec<u8>> {
         Ok(fs::read(path.as_ref())?)
     }
-    fn write_file(&self, path: &os::Path, data: &[u8]) -> os::Result<()> {
+    fn write_file(&self, path: &OsPath, data: &[u8]) -> os::Result<()> {
         Ok(fs::write(path.as_ref(), data)?)
     }
     fn tempdir(&self) -> os::Result<os::TempDir> {
         let dir = tempdir()?;
         let path = dir.path().to_string_lossy().into_owned();
-        let path = os::Path::from(path);
+        let path = OsPath::from(path);
         Ok(os::TempDir::new(path, dir))
     }
 
     fn get_compiler(&self, lang: &str) -> os::Result<os::CompilerInfo> {
         match lang {
             "c" => Ok(CompilerInfo {
-                bin: os::Path::from("cc"),
+                bin: OsPath::from("cc"),
                 flags: vec![],
             }),
             _ => bail!("Unsupported language: {lang}"),
         }
     }
 
-    fn find_program(&self, name: &os::Path, _cwd: &os::Path) -> os::Result<os::Path> {
+    fn find_program(&self, name: &OsPath, _cwd: &OsPath) -> os::Result<OsPath> {
         bail!("Not found: {}", name.as_ref());
     }
 
-    fn run_command(&self, cmd: &os::Path, args: &[&str]) -> os::Result<os::RunCommandOutput> {
+    fn run_command(&self, cmd: &OsPath, args: &[&str]) -> os::Result<os::RunCommandOutput> {
         eprintln!("Running command: {} {:?}", cmd.as_ref(), args);
 
         if cmd.as_ref() != "cc" {

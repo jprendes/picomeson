@@ -13,7 +13,10 @@ pub fn install_headers(
     kwargs: HashMap<String, Value>,
     interp: &mut Interpreter,
 ) -> Result<Value, InterpreterError> {
-    let headers = files_impl(&args, interp)?;
+    let headers = files_impl(&args, interp)?
+        .into_iter()
+        .map(|file| file.path)
+        .collect::<Vec<_>>();
 
     let install_dir = kwargs
         .get("install_dir")
