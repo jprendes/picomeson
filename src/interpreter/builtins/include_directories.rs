@@ -4,12 +4,13 @@ use alloc::vec::Vec;
 use hashbrown::HashMap;
 
 use super::builtin_impl;
-use crate::interpreter::builtins::files::{File, files_impl};
+use crate::interpreter::builtins::files::files_impl;
 use crate::interpreter::{Interpreter, InterpreterError, MesonObject, Value};
+use crate::os::Path;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct IncludeDirectories {
-    dirs: Vec<File>,
+    pub dirs: Vec<Path>,
 }
 
 impl MesonObject for IncludeDirectories {
@@ -21,7 +22,10 @@ pub fn include_directories(
     _kwargs: HashMap<String, Value>,
     interp: &mut Interpreter,
 ) -> Result<Value, InterpreterError> {
-    let dirs = files_impl(&args, interp)?;
+    let dirs = files_impl(&args, interp)?
+        .into_iter()
+        .map(|f| f.path)
+        .collect();
     let inc_dirs = IncludeDirectories { dirs };
     Ok(inc_dirs.into_object())
 }

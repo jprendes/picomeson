@@ -1,3 +1,5 @@
+use core::fmt;
+
 use alloc::string::String;
 use alloc::vec::Vec;
 
@@ -8,13 +10,27 @@ use crate::interpreter::builtins::utils::{AsValueSlice, flatten};
 use crate::interpreter::{Interpreter, InterpreterError, MesonObject, Value, bail_type_error};
 use crate::os::Path;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct File {
-    path: Path,
+    pub path: Path,
+}
+
+impl fmt::Debug for File {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "File({})", self.path)
+    }
 }
 
 impl MesonObject for File {
     builtin_impl!();
+}
+
+impl File {
+    pub fn from_path(path: impl AsRef<str>) -> Self {
+        Self {
+            path: Path::from(path.as_ref()),
+        }
+    }
 }
 
 pub(super) fn files_impl<'a, 'b: 'a>(
@@ -25,9 +41,7 @@ pub(super) fn files_impl<'a, 'b: 'a>(
     flatten(args)
         .map(|arg| {
             if let Ok(s) = arg.as_string() {
-                Ok(File {
-                    path: pwd.join(s),
-                })
+                Ok(File::from_path(pwd.join(s)))
             } else if let Ok(file) = arg.as_object::<File>() {
                 Ok(file.clone())
             } else {

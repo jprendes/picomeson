@@ -740,6 +740,10 @@ impl Interpreter {
         }
     }
 
+    pub fn get_option(&self, name: &str) -> Option<Value> {
+        self.options.get(name).map(|opt| opt.value.cloned())
+    }
+
     pub fn set_option(&mut self, name: &str, value: &str) -> Result<(), InterpreterError> {
         let Some(option) = self.options.get_mut(name) else {
             bail_runtime_error!(

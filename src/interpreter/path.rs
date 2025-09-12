@@ -1,7 +1,7 @@
 use alloc::string::String;
 use core::fmt;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+#[derive(Clone, PartialEq, Eq, Hash, Default)]
 pub struct Path(String);
 
 const SEP: &str = "/";
@@ -15,6 +15,12 @@ impl AsRef<str> for Path {
 impl fmt::Display for Path {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+impl fmt::Debug for Path {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Path({})", self.0)
     }
 }
 
@@ -56,7 +62,7 @@ impl Path {
     }
 
     pub fn join(&self, path: impl AsRef<str>) -> Self {
-        if path.as_ref().starts_with(SEP) {
+        if path.as_ref().starts_with(SEP) || self.0.is_empty() {
             return Self(path.as_ref().into());
         }
 
