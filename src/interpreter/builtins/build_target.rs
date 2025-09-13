@@ -58,7 +58,7 @@ impl BuildTarget {
         _kwargs: HashMap<String, Value>,
         interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
-        let path = interp.meson.borrow().build_dir.join(&self.filename);
+        let path = interp.build_dir.join(&self.filename);
         // Placeholder implementation
         Ok(Value::String(path.to_string()))
     }
@@ -156,7 +156,7 @@ fn add_target_impl(
         .context_type("Expected 'install_dir' keyword argument to be a string")?;
 
     let install_dir = match install_dir {
-        Some(dir) => Some(dir.into()),
+        Some(dir) => Some(Path::from(dir)),
         None => match target_type {
             TargetType::StaticLibrary => get_dir(interp, "libdir")?,
             TargetType::Executable => get_dir(interp, "bindir")?,
@@ -164,6 +164,13 @@ fn add_target_impl(
     }
     .map(Path::from)
     .context_runtime("Could not determine install directory")?;
+
+    let prefix =
+        get_dir(interp, "prefix")?.context_runtime("Could not determine installation prefix")?;
+
+    let install_dir = prefix.join(install_dir);
+
+    let implicit_include_dirs = [interp.build_dir.clone(), interp.current_dir.clone()];
 
     let include_dirs = kwargs
         .get("include_directories")
@@ -182,6 +189,7 @@ fn add_target_impl(
                 ))]
             }
         })
+        .chain(implicit_include_dirs.into_iter().map(Result::Ok))
         .collect::<Result<Vec<_>, _>>()?;
 
     let flags = kwargs
@@ -222,10 +230,10 @@ fn add_target_impl(
     Ok(lib.into_object())
 }
 
-fn get_dir(interp: &Interpreter, key: &str) -> Result<Option<String>, InterpreterError> {
+pub(super) fn get_dir(interp: &Interpreter, key: &str) -> Result<Option<Path>, InterpreterError> {
     interp
         .get_option(key)
-        .map(|v| v.as_string().map(String::from))
+        .map(|v| v.as_string().map(Path::from))
         .transpose()
         .with_context_type(|| format!("Expected '{key}' option to be a string"))
 }

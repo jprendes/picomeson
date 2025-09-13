@@ -5,6 +5,7 @@ use alloc::vec::Vec;
 use hashbrown::HashMap;
 
 use super::builtin_impl;
+use crate::interpreter::builtins::build_target::get_dir;
 use crate::interpreter::error::ErrorContext as _;
 use crate::interpreter::{
     Interpreter, InterpreterError, MesonObject, Value, bail_runtime_error, bail_type_error,
@@ -124,29 +125,61 @@ impl MesonObject for ConfigData {
     builtin_impl!(get, set, set10, merge_from);
 }
 
+pub struct ConfigureFile {
+    pub build_dir: Path,
+    pub filename: Path,
+    pub content: String,
+    pub install_dir: Path,
+    pub install: bool,
+}
+
 pub fn configure_file(
     _args: Vec<Value>,
     kwargs: HashMap<String, Value>,
     interp: &mut Interpreter,
 ) -> Result<Value, InterpreterError> {
-    let input = match kwargs.get("input") {
-        Some(Value::String(s)) => Some(s.clone()),
-        None => None,
-        _ => bail_type_error!("configure_file 'input' keyword argument must be a string"),
-    };
-    let Some(Value::String(output)) = kwargs.get("output") else {
-        bail_type_error!("configure_file requires an 'output' keyword argument of type string");
-    };
+    let input = kwargs
+        .get("input")
+        .map(Value::as_string)
+        .transpose()
+        .context_type("configure_file 'input' keyword argument must be a string")?;
+
+    let output = kwargs
+        .get("output")
+        .context_type("configure_file requires an 'output' keyword argument")?
+        .as_string()
+        .context_type("configure_file 'output' keyword argument must be a string")?;
+
     let configuration = kwargs
         .get("configuration")
         .context_type(
             "configure_file requires a 'configuration' keyword argument of type ConfigData",
         )?
         .as_object::<ConfigData>()?;
+
+    let prefix =
+        get_dir(interp, "prefix")?.context_runtime("Could not determine installation prefix")?;
+
+    let install_dir = kwargs
+        .get("install_dir")
+        .map(Value::as_string)
+        .transpose()
+        .context_type("configure_file 'install_dir' keyword argument must be a string")?
+        .map(|s| prefix.join(s))
+        .unwrap_or_default();
+
+    let install = kwargs
+        .get("install")
+        .map(Value::as_boolean)
+        .transpose()
+        .context_type("configure_file 'install' keyword argument must be a bool")?
+        .unwrap_or(false);
+
     if input.is_some() {
         // TODO: implement this
         return Ok(Value::None);
     }
+
     let mut data = configuration.data.iter().collect::<Vec<_>>();
     data.sort_by_key(|a| a.0);
 
@@ -173,7 +206,15 @@ pub fn configure_file(
         content.push('\n');
     }
 
-    interp.steps.write_file(&Path::from(output), &content);
+    let file = ConfigureFile {
+        build_dir: interp.build_dir.clone(),
+        filename: Path::from(output),
+        content: content,
+        install_dir,
+        install,
+    };
+
+    interp.steps.configure_file(&file);
 
     Ok(Value::None)
 }

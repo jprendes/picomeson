@@ -71,4 +71,11 @@ impl Path {
         new_path.push_str(path.as_ref());
         Self(new_path)
     }
+
+    pub fn filename(&self) -> &str {
+        self.0
+            .rsplit(SEP)
+            .next()
+            .unwrap_or(&self.0) // Fallback to the whole path if no separator is found
+    }
 }

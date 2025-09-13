@@ -81,7 +81,7 @@ impl os::Os for Os {
     }
 
     fn run_command(&self, cmd: &OsPath, args: &[&str]) -> os::Result<os::RunCommandOutput> {
-        eprintln!("Running command: {} {:?}", cmd.as_ref(), args);
+        //eprintln!("Running command: {} {:?}", cmd.as_ref(), args);
 
         if cmd.as_ref() != "cc" {
             bail!("Unsupported command: {}", cmd.as_ref());

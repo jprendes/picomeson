@@ -7,12 +7,9 @@ use super::builtin_impl;
 use crate::interpreter::builtins::compiler::get_compiler;
 use crate::interpreter::builtins::version::version;
 use crate::interpreter::{Interpreter, InterpreterError, MesonObject, Value};
-use crate::path::Path;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Meson {
-    pub build_dir: Path,
-    pub source_dir: Path,
     pub project_name: String,
     pub project_version: String,
     pub project_args: HashMap<String, Vec<String>>,
@@ -82,25 +79,23 @@ impl Meson {
         &self,
         _args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
-        _interp: &mut Interpreter,
+        interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
-        Ok(Value::String(self.build_dir.to_string()))
+        Ok(Value::String(interp.build_dir.to_string()))
     }
 
     fn current_source_dir(
         &self,
         _args: Vec<Value>,
         _kwargs: HashMap<String, Value>,
-        _interp: &mut Interpreter,
+        interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
-        Ok(Value::String(self.source_dir.to_string()))
+        Ok(Value::String(interp.current_dir.to_string()))
     }
 }
 
-pub fn meson(source_dir: Path, build_dir: Path) -> Meson {
+pub fn meson() -> Meson {
     Meson {
-        build_dir,
-        source_dir,
         project_name: "".into(),
         project_version: "0.0.0".into(),
         project_args: HashMap::new(),

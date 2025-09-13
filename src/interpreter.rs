@@ -220,6 +220,7 @@ pub struct Interpreter {
     continue_flag: bool,
     meson: Rc<RefCell<Meson>>,
     current_dir: Path,
+    build_dir: Path,
     os: Rc<dyn Os>,
     steps: Rc<dyn BuildSteps>,
 }
@@ -231,7 +232,7 @@ impl Interpreter {
         src_dir: Path,
         build_dir: Path,
     ) -> Result<Self, InterpreterError> {
-        let meson = meson(src_dir.clone(), build_dir);
+        let meson = meson();
         let meson = Rc::new(RefCell::new(meson));
 
         let mut interpreter = Self {
@@ -241,6 +242,7 @@ impl Interpreter {
             continue_flag: false,
             meson,
             current_dir: src_dir,
+            build_dir,
             os,
             steps,
         };

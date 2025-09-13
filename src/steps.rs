@@ -1,4 +1,5 @@
 pub use crate::interpreter::builtins::build_target::BuildTarget;
+pub use crate::interpreter::builtins::config_data::ConfigureFile;
 use crate::path::Path;
 
 /// Build steps abstraction for generating build system output
@@ -30,16 +31,15 @@ pub trait BuildSteps: 'static {
     ///              and output location
     fn build_executable(&self, target: &BuildTarget);
 
-    /// Generates build instructions for writing a file
+    /// Generates build instructions for generating a file
     ///
-    /// This method should generate a build step that writes the given content
-    /// to the specified output file. This is typically used for generating
-    /// configuration files, headers, or other text-based outputs.
+    /// This method should generate a build step that writes a file to disk
+    /// based on the content of ConfigureFile. `ConfigureFile` contains the
+    /// target output path and the content required to create the file.
     ///
     /// # Arguments
-    /// * `output` - The path where the file should be written
-    /// * `content` - The text content to write to the file
-    fn write_file(&self, output: &Path, content: &str);
+    /// * `file` - The `ConfigureFile` describing where to write and what to write
+    fn configure_file(&self, file: &ConfigureFile);
 
     /// Generates build instructions for installing header files
     ///
