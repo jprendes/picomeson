@@ -73,9 +73,6 @@ impl Path {
     }
 
     pub fn filename(&self) -> &str {
-        self.0
-            .rsplit(SEP)
-            .next()
-            .unwrap_or(&self.0) // Fallback to the whole path if no separator is found
+        self.0.rsplit(SEP).next().unwrap_or(&self.0) // Fallback to the whole path if no separator is found
     }
 }

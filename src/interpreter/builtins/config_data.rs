@@ -209,7 +209,7 @@ pub fn configure_file(
     let file = ConfigureFile {
         build_dir: interp.build_dir.clone(),
         filename: Path::from(output),
-        content: content,
+        content,
         install_dir,
         install,
     };

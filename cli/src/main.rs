@@ -1,9 +1,11 @@
 use std::fmt::Display;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 mod os;
 mod steps;
 
+use anyhow::Context;
 use clap::{Parser, ValueEnum};
 use os::Os;
 use steps::Steps;
@@ -48,10 +50,6 @@ impl Display for BuildType {
 #[command(about = "A minimal Meson build system implementation")]
 #[command(version)]
 struct Args {
-    /// Cross compilation configuration file
-    #[arg(long, value_name = "path")]
-    cross_file: Vec<PathBuf>,
-
     /// Build type to use
     #[arg(long, value_name = "build type", default_value = "debug")]
     buildtype: BuildType,
@@ -60,17 +58,9 @@ struct Args {
     #[arg(long, value_name = "dir", default_value = "/usr/local")]
     prefix: PathBuf,
 
-    /// Include directory (relative to prefix)
-    #[arg(long)]
-    includedir: Option<PathBuf>,
-
-    /// Library directory (relative to prefix)
-    #[arg(long)]
-    libdir: Option<PathBuf>,
-
     /// Set project options (can be used multiple times)
     #[arg(short = 'D', value_name = "option=value")]
-    define: Vec<String>,
+    define: Vec<Define>,
 
     /// Build directory
     build_dir: PathBuf,
@@ -78,6 +68,24 @@ struct Args {
     /// Source directory (defaults to current directory if not specified)
     #[arg(default_value = ".")]
     source_dir: PathBuf,
+}
+
+#[derive(Debug, Clone)]
+struct Define {
+    key: String,
+    value: String,
+}
+
+impl FromStr for Define {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (key, value) = s.split_once("=").context("No value specified for option")?;
+        Ok(Define {
+            key: key.to_string(),
+            value: value.to_string(),
+        })
+    }
 }
 
 fn main() -> anyhow::Result<()> {
@@ -91,22 +99,9 @@ fn main() -> anyhow::Result<()> {
     // Add prefix option
     builder.option("prefix", args.prefix.to_string_lossy());
 
-    // Add includedir option if provided
-    if let Some(includedir) = args.includedir {
-        builder.option("includedir", includedir.to_string_lossy());
-    }
-
-    // Add libdir option if provided
-    if let Some(libdir) = args.libdir {
-        builder.option("libdir", libdir.to_string_lossy());
-    }
-
-    for define in args.define {
-        if let Some((key, value)) = define.split_once('=') {
-            builder.option(key, value);
-            continue;
-        }
-        eprintln!("Ignoring unknown option: {define}");
+    // Add user-defined options
+    for Define { key, value } in args.define {
+        builder.option(key, value);
     }
 
     builder.build(

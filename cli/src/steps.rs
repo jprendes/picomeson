@@ -12,8 +12,7 @@ impl steps::BuildSteps for Steps {
         if file.install {
             eprintln!(
                 " > Installing header to {}: {} header",
-                file.install_dir,
-                file.filename
+                file.install_dir, file.filename
             );
         }
     }

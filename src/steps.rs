@@ -17,7 +17,7 @@ pub trait BuildSteps: 'static {
     ///
     /// # Arguments
     /// * `target` - The build target containing information about sources,
-    ///              include directories, compile flags, and output location
+    ///   include directories, compile flags, and output location
     fn build_static_library(&self, target: &BuildTarget);
 
     /// Generates build instructions for building an executable
@@ -27,8 +27,8 @@ pub trait BuildSteps: 'static {
     ///
     /// # Arguments
     /// * `target` - The build target containing information about sources,
-    ///              include directories, compile flags, link flags, dependencies,
-    ///              and output location
+    ///   include directories, compile flags, link flags, dependencies,
+    ///   and output location
     fn build_executable(&self, target: &BuildTarget);
 
     /// Generates build instructions for generating a file
