@@ -12,6 +12,12 @@ anyhow = { version = "1.0.99", default-features = false }
 name = "picomeson"
 version = "0.1.0"
 edition = "2024"
+license = "MIT OR Apache-2.0"
+homepage = "https://github.com/jprendes/picomeson"
+repository = "https://github.com/jprendes/picomeson"
+readme = "README.md"
+description = "A small parser for meson.build files"
+
 
 [dependencies]
 as-any = "0.3.2"
