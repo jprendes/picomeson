@@ -762,7 +762,7 @@ impl Interpreter {
             );
         };
 
-        match option.typ {
+        match option.r#type {
             OptionType::Boolean => {
                 let bool_value = value
                     .parse()

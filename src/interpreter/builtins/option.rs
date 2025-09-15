@@ -16,7 +16,7 @@ pub enum OptionType {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct BuildOption {
-    pub typ: OptionType,
+    pub r#type: OptionType,
     pub value: Value,
     pub description: String,
 }
@@ -32,7 +32,7 @@ pub fn option(
         .as_string()?
         .into();
 
-    let typ = kwargs
+    let r#type = kwargs
         .get("type")
         .context_type("Option requires a 'type' keyword argument")?
         .as_string()?;
@@ -69,7 +69,7 @@ pub fn option(
         .unwrap_or(i64::MAX);
 
     let value = kwargs.get("value");
-    let (value, typ) = match typ {
+    let (value, r#type) = match r#type {
         "boolean" => {
             let bool_value = value.map(Value::as_boolean).transpose()?.unwrap_or(true);
             (Value::Boolean(bool_value), OptionType::Boolean)
@@ -111,7 +111,7 @@ pub fn option(
     };
 
     let opt = BuildOption {
-        typ,
+        r#type,
         value: value.clone(),
         description: description.into(),
     };
