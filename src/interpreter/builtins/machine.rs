@@ -6,7 +6,7 @@ use hashbrown::HashMap;
 use super::builtin_impl;
 use crate::interpreter::error::ErrorContext;
 use crate::interpreter::{Interpreter, InterpreterError, MesonObject, Value};
-use crate::os::MachineInfo;
+use crate::runtime::MachineInfo;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Machine {

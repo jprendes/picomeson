@@ -1,8 +1,8 @@
-use picomeson::steps::{self, ConfigureFile};
+use picomeson::builder::{self, ConfigureFile};
 
-pub struct Steps;
+pub struct Logging;
 
-impl steps::BuildSteps for Steps {
+impl builder::Builder for Logging {
     fn configure_file(&self, file: &ConfigureFile) {
         eprintln!(
             " > Configuring file {}: {} bytes",
@@ -28,7 +28,7 @@ impl steps::BuildSteps for Steps {
         );
     }
 
-    fn build_executable(&self, target: &steps::BuildTarget) {
+    fn build_executable(&self, target: &builder::BuildTarget) {
         eprintln!(
             " > Building executable {}: {} sources",
             target.install_dir.join(&target.filename),
@@ -36,7 +36,7 @@ impl steps::BuildSteps for Steps {
         );
     }
 
-    fn build_static_library(&self, target: &steps::BuildTarget) {
+    fn build_static_library(&self, target: &builder::BuildTarget) {
         let is_empty = target.sources.is_empty()
             || (target.sources.len() == 1 && target.sources[0].filename() == "empty.c");
         if target.install && !is_empty {

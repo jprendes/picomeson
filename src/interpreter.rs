@@ -8,10 +8,10 @@ use core::fmt;
 use as_any::Downcast;
 use hashbrown::HashMap;
 
-use crate::os::Os;
+use crate::builder::Builder;
 use crate::parser::{BinaryOperator, Statement, UnaryOperator, Value as AstValue};
 use crate::path::Path;
-use crate::steps::BuildSteps;
+use crate::runtime::Runtime;
 
 pub(crate) mod builtins;
 
@@ -221,14 +221,14 @@ pub struct Interpreter {
     meson: Rc<RefCell<Meson>>,
     current_dir: Path,
     build_dir: Path,
-    os: Rc<dyn Os>,
-    steps: Rc<dyn BuildSteps>,
+    os: Rc<dyn Runtime>,
+    steps: Rc<dyn Builder>,
 }
 
 impl Interpreter {
     pub fn new(
-        os: Rc<dyn Os>,
-        steps: Rc<dyn BuildSteps>,
+        os: Rc<dyn Runtime>,
+        steps: Rc<dyn Builder>,
         src_dir: Path,
         build_dir: Path,
     ) -> Result<Self, InterpreterError> {

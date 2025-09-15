@@ -71,11 +71,11 @@ pub struct CompilerInfo {
     pub flags: Vec<String>,
 }
 
-/// Operating system abstraction layer
+/// Runtime abstraction layer
 ///
 /// This trait provides platform-agnostic access to OS functionality
 /// needed by the Meson build system implementation.
-pub trait Os: 'static {
+pub trait Runtime: 'static {
     /// Prints a message to the console
     ///
     /// # Arguments

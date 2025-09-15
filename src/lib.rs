@@ -2,12 +2,12 @@
 
 extern crate alloc;
 
+pub mod builder;
 mod interpreter;
 mod machine_file;
-pub mod os;
 mod parser;
 pub mod path;
-pub mod steps;
+pub mod runtime;
 
 use alloc::rc::Rc;
 use alloc::string::String;
@@ -17,13 +17,13 @@ use hashbrown::HashMap;
 use crate::path::Path;
 
 pub struct Meson {
-    os: Rc<dyn os::Os>,
-    steps: Rc<dyn steps::BuildSteps>,
+    os: Rc<dyn runtime::Runtime>,
+    steps: Rc<dyn builder::Builder>,
     options: HashMap<String, String>,
 }
 
 impl Meson {
-    pub fn new(os: impl os::Os, steps: impl steps::BuildSteps) -> Self {
+    pub fn new(os: impl runtime::Runtime, steps: impl builder::Builder) -> Self {
         let os = Rc::new(os);
         let steps = Rc::new(steps);
         let options = Default::default();

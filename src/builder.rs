@@ -2,14 +2,14 @@ pub use crate::interpreter::builtins::build_target::BuildTarget;
 pub use crate::interpreter::builtins::config_data::ConfigureFile;
 use crate::path::Path;
 
-/// Build steps abstraction for generating build system output
+/// Builder abstraction for generating build system output
 ///
 /// This trait defines the interface for different build system backends
 /// (e.g., Ninja, Make, etc.) to generate their specific build instructions.
 /// Implementations of this trait are responsible for translating high-level
 /// build targets and operations into the appropriate format for their
 /// respective build systems.
-pub trait BuildSteps: 'static {
+pub trait Builder: 'static {
     /// Generates build instructions for building a static library
     ///
     /// This method should generate the necessary build steps to compile

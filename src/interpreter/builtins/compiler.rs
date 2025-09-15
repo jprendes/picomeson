@@ -11,8 +11,8 @@ use crate::interpreter::error::ErrorContext as _;
 use crate::interpreter::{
     Interpreter, InterpreterError, MesonObject, Value, bail_runtime_error, bail_type_error,
 };
-use crate::os::{CompilerInfo, TryCompileOutput};
 use crate::path::Path;
+use crate::runtime::{CompilerInfo, TryCompileOutput};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Compiler {
