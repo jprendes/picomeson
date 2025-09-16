@@ -1,5 +1,5 @@
 use alloc::format;
-use alloc::string::String;
+use alloc::string::{String, ToString as _};
 use alloc::vec::Vec;
 
 use hashbrown::HashMap;
@@ -175,11 +175,42 @@ pub fn configure_file(
         .context_type("configure_file 'install' keyword argument must be a bool")?
         .unwrap_or(false);
 
-    if input.is_some() {
-        // TODO: implement this
-        return Ok(Value::None);
-    }
+    let content = if let Some(input) = input {
+        let input_path = interp.current_dir.join(input);
+        let template = interp
+            .os
+            .read_file(&input_path)
+            .context_runtime(&format!("Failed to read input file: {}", input_path))?;
 
+        let template =
+            String::from_utf8(template).context_runtime("Input file is not valid UTF-8")?;
+        configure_with_template(template, &configuration)?
+    } else {
+        configure_no_template(&configuration)?
+    };
+
+    let file = ConfigureFile {
+        build_dir: interp.build_dir.clone(),
+        filename: Path::from(output),
+        content,
+        install_dir,
+        install,
+    };
+
+    interp.steps.configure_file(&file);
+
+    Ok(Value::None)
+}
+
+pub fn configuration_data(
+    _args: Vec<Value>,
+    _kwargs: HashMap<String, Value>,
+    _interp: &mut Interpreter,
+) -> Result<Value, InterpreterError> {
+    Ok(ConfigData::default().into_object())
+}
+
+fn configure_no_template(configuration: &ConfigData) -> Result<String, InterpreterError> {
     let mut data = configuration.data.iter().collect::<Vec<_>>();
     data.sort_by_key(|a| a.0);
 
@@ -206,23 +237,44 @@ pub fn configure_file(
         content.push('\n');
     }
 
-    let file = ConfigureFile {
-        build_dir: interp.build_dir.clone(),
-        filename: Path::from(output),
-        content,
-        install_dir,
-        install,
-    };
-
-    interp.steps.configure_file(&file);
-
-    Ok(Value::None)
+    Ok(content)
 }
 
-pub fn configuration_data(
-    _args: Vec<Value>,
-    _kwargs: HashMap<String, Value>,
-    _interp: &mut Interpreter,
-) -> Result<Value, InterpreterError> {
-    Ok(ConfigData::default().into_object())
+fn configure_with_template(
+    mut template: String,
+    configuration: &ConfigData,
+) -> Result<String, InterpreterError> {
+    // Process the template: replace @KEY@ with values from configuration
+
+    // Replace configuration values
+    for (key, (value, _)) in configuration.data.iter() {
+        let placeholder = format!("@{}@", key);
+        let replacement = match value {
+            Value::Boolean(true) => "1".to_string(),
+            Value::Boolean(false) => "0".to_string(),
+            Value::Integer(i) => i.to_string(),
+            Value::String(s) => s.clone(),
+            _ => continue,
+        };
+        template = template.replace(&placeholder, &replacement);
+    }
+
+    // Check for any remaining unreplaced placeholders
+    if template.contains("@") {
+        // Find unreplaced placeholders for better error message
+        let unreplaced = template
+            .split('@')
+            .enumerate()
+            .filter_map(|(i, val)| (i % 2 == 1 && !val.is_empty()).then_some(val))
+            .collect::<Vec<_>>();
+
+        if !unreplaced.is_empty() {
+            bail_runtime_error!(
+                "configure_file: The following placeholders were not replaced: {}",
+                unreplaced.join(", ")
+            );
+        }
+    }
+
+    Ok(template)
 }
