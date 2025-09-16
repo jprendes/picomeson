@@ -180,7 +180,7 @@ pub fn configure_file(
         let template = interp
             .os
             .read_file(&input_path)
-            .context_runtime(&format!("Failed to read input file: {}", input_path))?;
+            .context_runtime(format!("Failed to read input file: {input_path}"))?;
 
         let template =
             String::from_utf8(template).context_runtime("Input file is not valid UTF-8")?;
