@@ -47,7 +47,7 @@ impl Compiler {
         interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         let code = include_str!("compiler/compiler_id.c");
-        let result = self.try_compile(&["-c", "-E"], &[], code, interp)?;
+        let result = self.try_compile(&["-E"], &[], code, interp)?;
         let output = String::from_utf8_lossy(&result.artifact);
         let suffix = output.rsplit_once(DELIMITER).map(|(_, s)| s.trim());
         match suffix {
@@ -196,7 +196,7 @@ impl Compiler {
         interp: &mut Interpreter,
     ) -> Result<Value, InterpreterError> {
         let code = include_str!("compiler/underscore_prefix.c");
-        let result = self.try_compile(&["-c", "-E"], &[], code, interp)?;
+        let result = self.try_compile(&["-E"], &[], code, interp)?;
         let output = String::from_utf8_lossy(&result.artifact);
         let suffix = output.rsplit_once(DELIMITER).map(|(_, s)| s.trim());
         match suffix {
